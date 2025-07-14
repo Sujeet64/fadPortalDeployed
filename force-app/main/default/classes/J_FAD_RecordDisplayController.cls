@@ -1,3 +1,10 @@
+/**
+ * @description       : 
+ * @author            : ChangeMeIn@UserSettingsUnder.SFDoc
+ * @group             : 
+ * @last modified on  : 07-14-2025
+ * @last modified by  : ChangeMeIn@UserSettingsUnder.SFDoc
+**/
 public with sharing class J_FAD_RecordDisplayController {
     
     public class RecordResponse {
@@ -87,7 +94,7 @@ public with sharing class J_FAD_RecordDisplayController {
         if (String.isNotBlank(finalSortBy)) {
             String sortField = finalSortBy.split(' ')[0];
             if (safeFields.contains(sortField) || sortField.contains('.')) {
-                query += ' ORDER BY ' + finalSortBy;
+                //query += ' ORDER BY ' + finalSortBy;
             }
         }
         
@@ -183,44 +190,50 @@ public with sharing class J_FAD_RecordDisplayController {
     }
 
     private static List<String> buildSearchableFields(String objectApiName, List<Object> fieldsConfig) {
-        Schema.SObjectType sObjectType = Schema.getGlobalDescribe().get(objectApiName);
-        Map<String, Schema.SObjectField> fieldMap = sObjectType.getDescribe().fields.getMap();
-        
-        List<String> searchableFields = new List<String>();
-        
-        for (Object fieldConfig : fieldsConfig) {
-            String fieldName = '';
-            if (fieldConfig instanceof String) {
-                fieldName = (String) fieldConfig;
-            } else if (fieldConfig instanceof Map<String, Object>) {
-                Map<String, Object> fieldMap2 = (Map<String, Object>) fieldConfig;
-                fieldName = (String) fieldMap2.get('fieldName');
-            }
+    Schema.SObjectType sObjectType = Schema.getGlobalDescribe().get(objectApiName);
+    Map<String, Schema.SObjectField> fieldMap = sObjectType.getDescribe().fields.getMap();
 
-            if (String.isNotBlank(fieldName)) {
-                if (fieldName.contains('.')) {
-                    if (fieldName.contains('Name') || fieldName.contains('DeveloperName')) {
-                        searchableFields.add(fieldName);
-                    }
-                } else if (fieldMap.containsKey(fieldName)) {
-                    Schema.SObjectField field = fieldMap.get(fieldName);
-                    Schema.DisplayType fieldType = field.getDescribe().getType();
-                    
-                    if (fieldType == Schema.DisplayType.STRING || 
-                        fieldType == Schema.DisplayType.TEXTAREA ||
-                        fieldType == Schema.DisplayType.EMAIL ||
-                        fieldType == Schema.DisplayType.PHONE ||
-                        fieldType == Schema.DisplayType.URL ||
-                        fieldType == Schema.DisplayType.PICKLIST ||
-                        fieldType == Schema.DisplayType.MULTIPICKLIST) {
-                        searchableFields.add(fieldName);
-                    }
+    List<String> searchableFields = new List<String>();
+
+    for (Object fieldConfig : fieldsConfig) {
+        String fieldName = '';
+        if (fieldConfig instanceof String) {
+            fieldName = (String) fieldConfig;
+        } else if (fieldConfig instanceof Map<String, Object>) {
+            Map<String, Object> fieldMap2 = (Map<String, Object>) fieldConfig;
+            fieldName = (String) fieldMap2.get('fieldName');
+        }
+
+        if (String.isNotBlank(fieldName)) {
+            if (fieldName.contains('.')) {
+                // Handle related fields (e.g., RecordType.Name or Owner.Name)
+                if (fieldName.contains('Name') || fieldName.contains('DeveloperName')) {
+                    searchableFields.add(fieldName);
+                }
+            } else if (fieldMap.containsKey(fieldName)) {
+                Schema.SObjectField field = fieldMap.get(fieldName);
+                Schema.DescribeFieldResult describe = field.getDescribe();
+                Schema.DisplayType fieldType = describe.getType();
+
+                Boolean isTextType = fieldType == Schema.DisplayType.STRING ||
+                                     fieldType == Schema.DisplayType.TEXTAREA ||
+                                     fieldType == Schema.DisplayType.EMAIL ||
+                                     fieldType == Schema.DisplayType.PHONE ||
+                                     fieldType == Schema.DisplayType.URL ||
+                                     fieldType == Schema.DisplayType.PICKLIST ||
+                                     fieldType == Schema.DisplayType.MULTIPICKLIST;
+
+                // Only include if filterable and not encrypted
+                if (isTextType && describe.isFilterable() && !describe.isEncrypted()) {
+                    searchableFields.add(fieldName);
                 }
             }
         }
-        
-        return searchableFields;
     }
+
+    return searchableFields;
+}
+
 
     @AuraEnabled
     public static void cleanupQueryLocatorCache() {
