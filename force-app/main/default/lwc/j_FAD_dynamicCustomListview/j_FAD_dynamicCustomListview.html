@@ -1,0 +1,205 @@
+<!--
+  @description       : Lightning Web Component for displaying a list of records with lazy loading and infinite scrolling
+  @author            : ChangeMeIn@UserSettingsUnder.SFDoc
+  @group             : 
+  @last modified on  : 07-11-2025
+  @last modified by  : ChangeMeIn@UserSettingsUnder.SFDoc
+-->
+<template>
+    <div class="list-view-container">
+        <!-- Header Section -->
+        <div class="list-header">
+            <div class="list-title-section">
+                <h1 class="list-title">
+                    <span class="title-text">{listTitle}</span>
+                </h1>
+            </div>
+
+            <!-- Search and Controls -->
+            <div class="search-controls">
+                <div class="search-container">
+                    <lightning-input
+                        type="search"
+                        placeholder="Search this list..."
+                        value={searchTerm}
+                        onchange={handleSearch}
+                        class="search-input">
+                    </lightning-input>
+                </div>
+                
+                <div class="control-buttons">
+                    <lightning-button-icon 
+                        icon-name="utility:refresh" 
+                        alternative-text="Refresh" 
+                        title="Refresh"
+                        onclick={handleRefresh}
+                        class="control-button">
+                    </lightning-button-icon>
+                </div>
+            </div>
+        </div>
+
+        <!-- Status Info Bar -->
+        <div class="status-info">
+            <span class="status-text">
+                {itemsDisplayText} • {sortInfoText} • {filterInfoText} • {updateInfoText}
+            </span>
+        </div>
+
+        <!-- Initial Loading Spinner -->
+        <template if:true={isLoading}>
+            <div class="loading-container">
+                <lightning-spinner alternative-text="Loading..." size="medium"></lightning-spinner>
+            </div>
+        </template>
+
+        <!-- Error Message -->
+        <template if:true={error}>
+            <div class="error-message">
+                <lightning-icon icon-name="utility:error" size="small" class="error-icon"></lightning-icon>
+                <span>{error}</span>
+            </div>
+        </template>
+
+        <!-- Desktop Table View -->
+        <template if:false={isLoading}>
+            <div class="table-container" onscroll={handleScroll} data-loading-type="infiniteScroll">
+                <table class="slds-table slds-table_cell-buffer slds-table_bordered slds-table_fixed-layout">
+                    <thead>
+                        <tr class="slds-line-height_reset">
+                            <template for:each={columns} for:item="column">
+                                <th key={column.fieldName} class="slds-text-title_caps sortable-header" scope="col">
+                                    <div class="header-content" data-field={column.fieldName} onclick={handleSort}>
+                                        <span class="slds-truncate">{column.label}</span>
+                                        <template if:true={column.sortable}>
+                                            <lightning-icon 
+                                                icon-name={column.sortIcon} 
+                                                size="xx-small" 
+                                                class="sort-icon">
+                                            </lightning-icon>
+                                        </template>
+                                    </div>
+                                </th>
+                            </template>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <template for:each={filteredRecords} for:item="record">
+                            <tr key={record.key} class="data-row" data-id={record.Id} onclick={handleRowClick}>
+                                <template for:each={record.cells} for:item="cell">
+                                    <td key={cell.fieldName} class="data-cell">
+                                        <div class="slds-truncate cell-content">
+                                            <template if:true={cell.value}>
+                                                <template if:false={cell.isLink}>
+                                                    {cell.displayValue}
+                                                </template>
+                                                <template if:true={cell.isLink}>
+                                                    <a href="#" class="cell-link">{cell.displayValue}</a>
+                                                </template>
+                                            </template>
+                                        </div>
+                                    </td>
+                                </template>
+                            </tr>
+                        </template>
+                    </tbody>
+                </table>
+                
+                <!-- Desktop Infinite Scroll Loading Indicator -->
+                <template if:true={showInfiniteScrollLoader}>
+                    <div class="desktop-infinite-scroll-loading">
+                        <lightning-spinner alternative-text="Loading more records..." size="small"></lightning-spinner>
+                        <span class="loading-text">Loading more records...</span>
+                    </div>
+                </template>
+            </div>
+
+            <!-- Mobile Card View -->
+            <div class="mobile-card-container" onscroll={handleScroll} data-loading-type="infiniteScroll">
+                <template for:each={displayedRecords} for:item="record">
+                    <div key={record.key} class="mobile-card" data-id={record.Id} onclick={handleRowClick}>
+                        <div class="mobile-card-header">
+                            <template if:true={record.primaryField}>
+                                <template if:false={record.primaryField.isLink}>
+                                    <div class="mobile-card-title">{record.primaryField.displayValue}</div>
+                                </template>
+                                <template if:true={record.primaryField.isLink}>
+                                    <a href="#" class="mobile-card-title">{record.primaryField.displayValue}</a>
+                                </template>
+                            </template>
+                            <template if:false={record.primaryField}>
+                                <div class="mobile-card-title">Record {record.rowNumber}</div>
+                            </template>
+                        </div>
+                        
+                        <div class="mobile-card-content">
+                            <template for:each={record.visibleFields} for:item="field">
+                                <div key={field.fieldName} class="mobile-field-row">
+                                    <span class="mobile-field-label">{field.label}:</span>
+                                    <template if:true={field.value}>
+                                        <template if:false={field.isLink}>
+                                            <span class="mobile-field-value">{field.displayValue}</span>
+                                        </template>
+                                        <template if:true={field.isLink}>
+                                            <a href="#" class="mobile-field-value is-link">{field.displayValue}</a>
+                                        </template>
+                                    </template>
+                                    <template if:false={field.value}>
+                                        <span class="mobile-field-value">—</span>
+                                    </template>
+                                </div>
+                            </template>
+
+                            <template if:true={record.showExpandButton}>
+                                <div class="expanded-fields-container">
+                                    <template for:each={record.hiddenFields} for:item="field">
+                                        <div key={field.fieldName} class="mobile-field-row expanded-field"
+                                             data-expanded={record.isExpanded}>
+                                            <span class="mobile-field-label">{field.label}:</span>
+                                            <template if:true={field.value}>
+                                                <template if:false={field.isLink}>
+                                                    <span class="mobile-field-value">{field.displayValue}</span>
+                                                </template>
+                                                <template if:true={field.isLink}>
+                                                    <a href="#" class="mobile-field-value is-link">{field.displayValue}</a>
+                                                </template>
+                                            </template>
+                                            <template if:false={field.value}>
+                                                <span class="mobile-field-value">—</span>
+                                            </template>
+                                        </div>
+                                    </template>
+                                </div>
+
+                                <button class="expand-button" data-id={record.Id} onclick={handleCardExpand}>
+                                    <template if:true={record.isExpanded}>
+                                        Show Less
+                                    </template>
+                                    <template if:false={record.isExpanded}>
+                                        Show More
+                                    </template>
+                                </button>
+                            </template>
+                        </div>
+                    </div>
+                </template>
+
+                <!-- Mobile Infinite Scroll Loading Indicator -->
+                <template if:true={showInfiniteScrollLoader}>
+                    <div class="infinite-scroll-loading">
+                        <lightning-spinner alternative-text="Loading more records..." size="small"></lightning-spinner>
+                        <span class="loading-text">Loading more records...</span>
+                    </div>
+                </template>
+            </div>
+
+            <!-- No Records Message -->
+            <template if:false={filteredRecords.length}>
+                <div class="no-records-message">
+                    <lightning-icon icon-name="utility:info" size="small" class="info-icon"></lightning-icon>
+                    <span>No records to display.</span>
+                </div>
+            </template>
+        </template>
+    </div>
+</template>

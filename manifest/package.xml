@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Package xmlns="http://soap.sforce.com/2006/04/metadata">
+	<types>
+		<members>J_FAD_RecordDisplayController</members>
+		<name>ApexClass</name>
+	</types>
+	<types>
+		<members>J_FAD_Listview_RecordDisplayConfig__mdt.Display_Records__c</members>
+		<name>CustomField</name>
+	</types>
+	<types>
+		<members>J_FAD_Listview_RecordDisplayConfig.PatientList</members>
+		<members>J_FAD_Listview_RecordDisplayConfig.PharmacyList</members>
+		<name>CustomMetadata</name>
+	</types>
+	<types>
+		<members>J_FAD_Listview_RecordDisplayConfig__mdt</members>
+		<name>CustomObject</name>
+	</types>
+	<types>
+		<members>J_FAD_Listview_RecordDisplayConfig__mdt-RecordDisplayConfig Layout</members>
+		<name>Layout</name>
+	</types>
+	<types>
+		<members>j_FAD_dynamicCustomListview</members>
+		<name>LightningComponentBundle</name>
+	</types>
+	<version>64.0</version>
+</Package>

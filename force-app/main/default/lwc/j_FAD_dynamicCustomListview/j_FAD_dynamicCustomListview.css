@@ -1,0 +1,842 @@
+/* Main Container */
+.list-view-container {
+    background: #ffffff;
+    border: 1px solid #c9c9c9;
+    border-radius: 0.25rem;
+    font-family: 'Salesforce Sans', Arial, sans-serif;
+    height: 100vh; /* FIXED: Set explicit height */
+    display: flex;
+    flex-direction: column;
+    overflow: hidden; /* FIXED: Prevent outer scroll */
+}
+
+/* Header Section */
+.list-header {
+    background: #f4f6f9;
+    border-bottom: 1px solid #c9c9c9;
+    padding: 0.75rem 1rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    min-height: 3rem;
+    flex-shrink: 0; /* FIXED: Prevent header from shrinking */
+}
+
+.list-title-section {
+    display: flex;
+    align-items: center;
+}
+
+.list-title {
+    font-size: 1.125rem;
+    font-weight: 700;
+    color: #5b5b5b;
+    margin: 0;
+    display: flex;
+    align-items: center;
+}
+
+.title-text {
+    margin-right: 0.5rem;
+}
+
+.title-dropdown {
+    margin-right: 0.5rem;
+    color: #5b5b5b;
+}
+
+.title-edit {
+    color: #5b5b5b;
+}
+
+/* Search and Controls */
+.search-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.search-container {
+    position: relative;
+}
+
+.search-input {
+    width: 300px;
+}
+
+/* ZOOM PREVENTION: Apply to ALL search inputs across all screen sizes */
+.search-input input,
+.search-input lightning-input input,
+lightning-input[type="search"] input,
+input[type="search"] {
+    border: 1px solid #c9c9c9;
+    border-radius: 0.25rem;
+    padding: 0.5rem 0.75rem;
+    font-size: 16px !important; /* CRITICAL: Prevents zoom on iOS/mobile devices */
+    background: #ffffff;
+    -webkit-appearance: none; /* Remove default iOS styling */
+    -moz-appearance: none; /* Remove default Firefox styling */
+    appearance: none; /* Remove default styling */
+}
+
+.search-input input:focus,
+.search-input lightning-input input:focus,
+lightning-input[type="search"] input:focus,
+input[type="search"]:focus {
+    border-color: #1589ee;
+    box-shadow: 0 0 0 1px #1589ee;
+    outline: none;
+    font-size: 16px !important; /* Maintain font size on focus */
+}
+
+.control-buttons {
+    display: flex;
+    gap: 0.25rem;
+}
+
+.control-button {
+    background: transparent;
+    border: 1px solid #c9c9c9;
+    border-radius: 0.25rem;
+    color: #5b5b5b;
+    padding: 0.5rem;
+}
+
+.control-button:hover {
+    background: #f4f6f9;
+}
+
+/* Status Info Bar */
+.status-info {
+    background: #ffffff;
+    border-bottom: 1px solid #c9c9c9;
+    padding: 0.5rem 1rem;
+    font-size: 0.75rem;
+    color: #5b5b5b;
+    flex-shrink: 0; /* FIXED: Prevent shrinking */
+}
+
+.status-text {
+    line-height: 1.25;
+}
+
+/* Loading State */
+.loading-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 2rem;
+    flex-grow: 1;
+}
+
+/* Error Message */
+.error-message {
+    background: #fef5e7;
+    border: 1px solid #fe9339;
+    border-radius: 0.25rem;
+    color: #8c4a00;
+    padding: 0.75rem;
+    margin: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.error-icon {
+    color: #fe9339;
+}
+
+/* FIXED: Table Container with proper infinite scroll support */
+.table-container {
+    flex-grow: 1;
+    overflow-y: auto;
+    overflow-x: auto;
+    border: 1px solid #c9c9c9;
+    border-top: none;
+    position: relative;
+    min-height: 0; /* FIXED: Allow flexbox to shrink */
+}
+
+.table-container[data-loading-type="infiniteScroll"] {
+    max-height: none;
+    height: auto;
+}
+
+.table-container[data-loading-type="loadMore"] {
+    max-height: none;
+    overflow-y: visible;
+}
+
+/* Table Styles */
+.slds-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: #ffffff;
+}
+
+.slds-table thead {
+    background: #f4f6f9;
+    position: sticky;
+    top: 0;
+    z-index: 2;
+}
+
+.slds-table th {
+    background: #f4f6f9;
+    border-bottom: 1px solid #c9c9c9;
+    border-right: 1px solid #c9c9c9;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: #5b5b5b;
+    text-transform: uppercase;
+    padding: 0.5rem 0.75rem;
+    text-align: left;
+    white-space: nowrap;
+    position: relative;
+}
+
+.slds-table th:last-child {
+    border-right: none;
+}
+
+.row-number-header {
+    width: 3rem;
+    text-align: center;
+}
+
+.sortable-header {
+    cursor: pointer;
+    user-select: none;
+}
+
+.sortable-header:hover {
+    background: #e8eaed;
+}
+
+.header-content {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+}
+
+.sort-icon {
+    opacity: 0.6;
+    margin-left: 0.25rem;
+}
+
+.sortable-header:hover .sort-icon {
+    opacity: 1;
+}
+
+/* Table Body */
+.slds-table tbody tr {
+    border-bottom: 1px solid #c9c9c9;
+}
+
+.data-row {
+    cursor: pointer;
+    background: #ffffff;
+}
+
+.data-row:hover {
+    background: #f4f6f9;
+}
+
+.data-row:nth-child(even) {
+    background: #fafafa;
+}
+
+.data-row:nth-child(even):hover {
+    background: #f4f6f9;
+}
+
+.slds-table td {
+    padding: 0.5rem 0.75rem;
+    border-right: 1px solid #c9c9c9;
+    font-size: 0.8125rem;
+    color: #181818;
+    vertical-align: top;
+}
+
+.slds-table td:last-child {
+    border-right: none;
+}
+
+.row-number-cell {
+    width: 3rem;
+    text-align: center;
+    color: #5b5b5b;
+    font-weight: 400;
+}
+
+.data-cell {
+    max-width: 0;
+    overflow: hidden;
+}
+
+.cell-content {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.cell-link {
+    color: #1589ee;
+    text-decoration: none;
+}
+
+.cell-link:hover {
+    text-decoration: underline;
+}
+
+/* Desktop infinite scroll loading indicator */
+.desktop-infinite-scroll-loading {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 1rem;
+    gap: 0.5rem;
+    background: #ffffff;
+    border-top: 1px solid #c9c9c9;
+    position: sticky;
+    bottom: 0;
+    z-index: 1;
+}
+
+.desktop-infinite-scroll-loading .loading-text {
+    font-size: 0.9rem;
+    color: #706e6b;
+}
+
+.table-container, .mobile-card-container {
+    scroll-behavior: smooth;
+}
+
+/* No Records Message */
+.no-records-message {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 2rem;
+    color: #5b5b5b;
+    font-size: 0.875rem;
+    gap: 0.5rem;
+}
+
+.info-icon {
+    color: #1589ee;
+}
+
+/* Mobile Card Container */
+.mobile-card-container {
+    display: none;
+    flex-direction: column;
+    gap: 1rem;
+    padding: 1rem;
+    background: #f8f9fa;
+    /* Remove max-height to allow natural scrolling */
+    max-height: none;
+    overflow-y: auto;
+    overflow-x: hidden;
+    flex-grow: 1;
+}
+
+.mobile-card-container[data-loading-type="infiniteScroll"] {
+    /* Remove max-height restriction for infinite scroll */
+    max-height: none;
+    height: auto;
+}
+
+.mobile-card-container[data-loading-type="loadMore"] {
+    max-height: none;
+    overflow-y: visible;
+}
+
+.mobile-card {
+    background: #ffffff;
+    border-radius: 0.5rem;
+    padding: 1rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    border: 1px solid #e5e7eb;
+    margin-bottom: 0.75rem;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.mobile-card:hover {
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+    transform: translateY(-1px);
+}
+
+.mobile-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 0.75rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.mobile-card-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #1589ee;
+    text-decoration: none;
+    flex-grow: 1;
+    margin-right: 0.5rem;
+    line-height: 1.3;
+}
+
+.mobile-card-title:hover {
+    text-decoration: underline;
+}
+
+.mobile-card-subtitle {
+    font-size: 0.75rem;
+    color: #666;
+    font-weight: 400;
+}
+
+.mobile-card-content {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.mobile-field-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    min-height: 1.25rem;
+    padding: 0.25rem 0;
+    border-bottom: 1px solid #f8f9fa;
+}
+
+.mobile-field-row:last-child {
+    border-bottom: none;
+}
+
+.mobile-field-label {
+    font-size: 0.8rem;
+    color: #6b7280;
+    font-weight: 500;
+    flex-shrink: 0;
+    margin-right: 1rem;
+    min-width: 100px;
+    text-transform: capitalize;
+}
+
+.mobile-field-value {
+    font-size: 0.9rem;
+    color: #1f2937;
+    text-align: right;
+    flex-grow: 1;
+    word-wrap: break-word;
+    line-height: 1.3;
+    max-width: 200px;
+}
+
+.mobile-field-value.is-link {
+    color: #1589ee;
+    text-decoration: none;
+}
+
+.mobile-field-value.is-link:hover {
+    text-decoration: underline;
+}
+
+.expanded-fields-container {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+}
+
+.expanded-field {
+    display: none;
+    opacity: 0;
+    max-height: 0;
+    overflow: hidden;
+    transition: all 0.3s ease;
+}
+
+.expanded-field[data-expanded="true"] {
+    display: flex;
+    opacity: 1;
+    max-height: none;
+    animation: expandField 0.3s ease-in-out;
+}
+
+.expand-button {
+    background: linear-gradient(135deg, #1589ee 0%, #0c7cd5 100%);
+    color: white;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 0.375rem;
+    font-size: 0.85rem;
+    font-weight: 500;
+    cursor: pointer;
+    margin-top: 0.75rem;
+    text-align: center;
+    width: 100%;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 4px rgba(21, 137, 238, 0.2);
+}
+
+.expand-button:hover {
+    background: linear-gradient(135deg, #0c7cd5 0%, #0a6bb8 100%);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(21, 137, 238, 0.3);
+}
+
+.expand-button:active {
+    transform: translateY(0);
+}
+
+@keyframes expandField {
+    from {
+        opacity: 0;
+        max-height: 0;
+        padding: 0;
+    }
+    to {
+        opacity: 1;
+        max-height: 50px;
+        padding: 0.25rem 0;
+    }
+}
+
+.load-more-container {
+    display: flex;
+    justify-content: center;
+    padding: 1rem;
+    margin-top: 1rem;
+}
+
+.load-more-button {
+    background: #0176d3;
+    color: white;
+    border: none;
+    padding: 0.75rem 1.5rem;
+    border-radius: 0.25rem;
+    font-size: 0.9rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    transition: background-color 0.2s ease;
+}
+
+.load-more-button:hover {
+    background: linear-gradient(135deg, #4b5563 0%, #374151 100%);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(107, 114, 128, 0.3);
+}
+
+.load-more-button:hover:not(:disabled) {
+    background: #014486;
+}
+
+.load-more-button:disabled {
+    background: #dddbda;
+    color: #706e6b;
+    cursor: not-allowed;
+}
+
+/* Infinite Scroll Loading Indicator */
+.infinite-scroll-loading {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 1rem;
+    gap: 0.5rem;
+    background: #f8f9fa;
+    position: sticky;
+    bottom: 0;
+    z-index: 1;
+}
+
+.infinite-scroll-loading .loading-text {
+    font-size: 0.9rem;
+    color: #706e6b;
+}
+
+/* UNIVERSAL ZOOM PREVENTION - Applied to all screen sizes */
+/* Target all possible search input variations */
+.search-input input,
+.search-input lightning-input input,
+lightning-input[type="search"] input,
+input[type="search"],
+input[type="text"],
+input[placeholder*="search" i],
+input[placeholder*="Search" i] {
+    font-size: 16px !important;
+    -webkit-text-size-adjust: 100%;
+    -moz-text-size-adjust: 100%;
+    -ms-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+}
+
+/* Additional zoom prevention for focus states */
+.search-input input:focus,
+.search-input lightning-input input:focus,
+lightning-input[type="search"] input:focus,
+input[type="search"]:focus,
+input[type="text"]:focus,
+input[placeholder*="search" i]:focus,
+input[placeholder*="Search" i]:focus {
+    font-size: 16px !important;
+    zoom: 1;
+    -webkit-text-size-adjust: 100%;
+    -moz-text-size-adjust: 100%;
+    -ms-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .list-header {
+        flex-direction: column;
+        gap: 0.75rem;
+        align-items: stretch;
+    }
+    
+    .search-controls {
+        justify-content: space-between;
+    }
+    
+    .search-container {
+        flex-grow: 1;
+    }
+    
+    .search-input {
+        width: 100%;
+    }
+    
+    /* ZOOM PREVENTION: Ensure 16px font size on mobile */
+    .search-input input,
+    .search-input lightning-input input,
+    lightning-input[type="search"] input,
+    input[type="search"] {
+        font-size: 16px !important;
+    }
+    
+    .slds-table th,
+    .slds-table td {
+        padding: 0.25rem 0.5rem;
+        font-size: 0.75rem;
+    }
+}
+
+/* Mobile specific header adjustments */
+@media (max-width: 480px) {
+    .mobile-card {
+        padding: 0.75rem;
+        margin-bottom: 0.5rem;
+    }
+    
+    .mobile-field-label {
+        min-width: 80px;
+        font-size: 0.75rem;
+    }
+    
+    .mobile-field-value {
+        font-size: 0.85rem;
+        max-width: 150px;
+    }
+    
+    .mobile-card-title {
+        font-size: 1rem;
+    }
+    
+    /* ZOOM PREVENTION: Maintain 16px font size on small mobile */
+    .search-input input,
+    .search-input lightning-input input,
+    lightning-input[type="search"] input,
+    input[type="search"] {
+        font-size: 16px !important;
+    }
+}
+
+@media (max-width: 1024px) {
+    .list-header {
+        flex-direction: column;
+        gap: 0.75rem;
+        align-items: stretch;
+        padding: 0.5rem;
+    }
+    
+    .search-controls {
+        justify-content: space-between;
+    }
+    
+    .search-container {
+        flex-grow: 1;
+        margin-right: 0.5rem;
+    }
+    
+    .search-input {
+        width: 100%;
+    }
+    
+    /* ZOOM PREVENTION: Critical for tablets and mobile */
+    .search-input input,
+    .search-input lightning-input input,
+    lightning-input[type="search"] input,
+    input[type="search"] {
+        font-size: 16px !important; /* Prevents zoom on iOS/mobile devices */
+    }
+    
+    .status-info {
+        font-size: 0.6875rem;
+        padding: 0.25rem 0.5rem;
+    }
+    
+    /* Hide table, show mobile cards */
+    .table-container {
+        display: none;
+    }
+    
+    .mobile-card-container {
+        display: flex;
+    }
+    
+    .list-title {
+        font-size: 1rem;
+    }
+    
+    .control-buttons {
+        flex-shrink: 0;
+    }
+}
+
+@media (max-width: 768px) {
+    .mobile-card-container[data-loading-type="infiniteScroll"] {
+        max-height: 60vh;
+    }
+    
+    .mobile-card-container[data-loading-type="infiniteScroll"] {
+        /* Remove max-height restriction for mobile infinite scroll */
+        max-height: none;
+        height: auto;
+    }
+}
+
+@media (min-width: 769px) {
+    .mobile-card-container {
+        display: none;
+    }
+}
+
+/* Tablet specific adjustments */
+@media (min-width: 768px) and (max-width: 1024px) {
+    .mobile-card {
+        padding: 1.25rem;
+        margin-bottom: 1rem;
+    }
+    
+    .mobile-card-title {
+        font-size: 1.2rem;
+    }
+    
+    .mobile-field-label {
+        min-width: 120px;
+        font-size: 0.85rem;
+    }
+    
+    .mobile-field-value {
+        font-size: 0.95rem;
+        max-width: 250px;
+    }
+    
+    .mobile-card-container {
+        padding: 1.5rem;
+        gap: 1.25rem;
+    }
+    
+    .expand-button {
+        padding: 0.75rem 1.5rem;
+        font-size: 0.9rem;
+    }
+    
+    .load-more-button {
+        padding: 0.875rem 2.5rem;
+        font-size: 0.9rem;
+    }
+    
+    /* ZOOM PREVENTION: Maintain 16px font size on tablets */
+    .search-input input,
+    .search-input lightning-input input,
+    lightning-input[type="search"] input,
+    input[type="search"] {
+        font-size: 16px !important;
+    }
+}
+
+/* Ensure table is visible on desktop */
+@media (min-width: 1025px) {
+    .table-container {
+        display: block;
+    }
+    
+    .mobile-card-container {
+        display: none;
+    }
+    
+    /* ZOOM PREVENTION: Even on desktop, maintain consistency */
+    .search-input input,
+    .search-input lightning-input input,
+    lightning-input[type="search"] input,
+    input[type="search"] {
+        font-size: 16px !important;
+    }
+}
+
+/* Utility Classes */
+.slds-truncate {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.slds-text-title_caps {
+    text-transform: uppercase;
+}
+
+.slds-line-height_reset {
+    line-height: 1;
+}
+
+/* ADDITIONAL ZOOM PREVENTION LAYER */
+/* Target Lightning Web Component shadow DOM elements */
+:host {
+    --lwc-fontSize: 16px;
+}
+
+/* Prevent zoom on any input within the component */
+* input[type="search"],
+* input[type="text"] {
+    font-size: 16px !important;
+    -webkit-text-size-adjust: 100% !important;
+    -moz-text-size-adjust: 100% !important;
+    -ms-text-size-adjust: 100% !important;
+    text-size-adjust: 100% !important;
+}
+
+/* Force font size on Lightning components */
+lightning-input,
+lightning-input input,
+.slds-input {
+    font-size: 16px !important;
+}
+
+/* Specific targeting for search inputs */
+[data-id="search-input"] input,
+[data-id="search-input"] lightning-input input,
+.search-input [part="input"],
+.search-input lightning-input [part="input"] {
+    font-size: 16px !important;
+}

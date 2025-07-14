@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomMetadata xmlns="http://soap.sforce.com/2006/04/metadata" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+    <label>PharmacyList</label>
+    <protected>false</protected>
+    <values>
+        <field>Display_Records__c</field>
+        <value xsi:type="xsd:string">{
+    &quot;objectApiName&quot;: &quot;Account&quot;,
+    &quot;recordType&quot;: &quot;VHS_Pharmacy&quot;,
+    &quot;isActive&quot;: true,
+    &quot;listTitle&quot;: &quot;Pharmaceutical Accounts&quot;,
+    &quot;sortBy&quot;: &quot;Name ASC&quot;,
+    &quot;searchable&quot;: true,
+    &quot;refreshable&quot;: true,
+    &quot;exportable&quot;: true,
+    &quot;isExpandable&quot;: false,
+    &quot;isExpanded&quot;: false,
+    &quot;visibleMobileFields&quot;: 2,
+    &quot;fields&quot;: [
+        {
+            &quot;fieldName&quot;: &quot;Name&quot;,
+            &quot;label&quot;: &quot;Account Name&quot;,
+            &quot;type&quot;: &quot;text&quot;,
+            &quot;isLink&quot;: true,
+            &quot;sortable&quot;: true
+        },
+        {
+            &quot;fieldName&quot;: &quot;Industry&quot;,
+            &quot;label&quot;: &quot;Industry&quot;,
+            &quot;type&quot;: &quot;picklist&quot;,
+            &quot;sortable&quot;: true
+        },
+        {
+            &quot;fieldName&quot;: &quot;Phone&quot;,
+            &quot;label&quot;: &quot;Phone Number&quot;,
+            &quot;type&quot;: &quot;phone&quot;,
+            &quot;sortable&quot;: true
+        },
+        {
+            &quot;fieldName&quot;: &quot;RecordType.DeveloperName&quot;,
+            &quot;label&quot;: &quot;Record Type Developer&quot;,
+            &quot;type&quot;: &quot;text&quot;,
+            &quot;sortable&quot;: true
+        },
+        {
+            &quot;fieldName&quot;: &quot;RecordType.Name&quot;,
+            &quot;label&quot;: &quot;Record Type Name&quot;,
+            &quot;type&quot;: &quot;text&quot;,
+            &quot;sortable&quot;: true
+        },
+        {
+            &quot;fieldName&quot;: &quot;CreatedDate&quot;,
+            &quot;label&quot;: &quot;Created Date&quot;,
+            &quot;type&quot;: &quot;datetime&quot;,
+            &quot;sortable&quot;: true
+        }
+    ],
+    &quot;filters&quot;: [
+        {
+            &quot;fieldName&quot;: &quot;Industry&quot;,
+            &quot;operator&quot;: &quot;IN&quot;,
+            &quot;values&quot;: [&quot;Pharmacy&quot;, &quot;Payer&quot;]
+        }
+    ],
+    &quot;actions&quot;: [
+        {
+            &quot;label&quot;: &quot;Edit&quot;,
+            &quot;name&quot;: &quot;edit&quot;,
+            &quot;icon&quot;: &quot;utility:edit&quot;
+        },
+        {
+            &quot;label&quot;: &quot;Delete&quot;,
+            &quot;name&quot;: &quot;delete&quot;,
+            &quot;icon&quot;: &quot;utility:delete&quot;
+        }
+    ]
+}</value>
+    </values>
+</CustomMetadata>
