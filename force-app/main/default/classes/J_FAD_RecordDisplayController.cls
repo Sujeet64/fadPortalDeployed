@@ -1,10 +1,10 @@
 /**
- * @description       : 
+ * @description       : Controller for handling record display and search functionality in a list view.
  * @author            : ChangeMeIn@UserSettingsUnder.SFDoc
  * @group             : 
- * @last modified on  : 07-14-2025
+ * @last modified on  : 07-15-2025
  * @last modified by  : ChangeMeIn@UserSettingsUnder.SFDoc
-**/
+ */
 public with sharing class J_FAD_RecordDisplayController {
     
     public class RecordResponse {
@@ -55,7 +55,11 @@ public with sharing class J_FAD_RecordDisplayController {
             }
 
             List<String> safeFields = buildSafeFields(objectApiName, fieldsConfig);
-            List<String> searchableFields = buildSearchableFields(objectApiName, fieldsConfig);
+            // Ensure IsPersonAccount is included in the query for Account object
+            if (objectApiName == 'Account' && !safeFields.contains('IsPersonAccount')) {
+                safeFields.add('IsPersonAccount');
+            }
+            List<Map<String, Object>> searchableFields = buildSearchableFields(objectApiName, fieldsConfig);
 
             List<String> whereConditions = new List<String>();
             
@@ -63,19 +67,42 @@ public with sharing class J_FAD_RecordDisplayController {
                 whereConditions.add('RecordType.DeveloperName = \'' + String.escapeSingleQuotes(recordType) + '\'');
             }
 
-            String likePattern = '%' + (String.isNotBlank(searchTerm) ? searchTerm : '') + '%';
             if (String.isNotBlank(searchTerm) && !searchableFields.isEmpty()) {
-                List<String> searchConditions = new List<String>();
-                for (String searchField : searchableFields) {
-                    searchConditions.add(searchField + ' LIKE :likePattern');
+                List<String> personAccountSearchConditions = new List<String>();
+                List<String> businessAccountSearchConditions = new List<String>();
+                for (Map<String, Object> searchField : searchableFields) {
+                    String fieldName = (String) searchField.get('fieldName');
+                    Boolean isEncrypted = (Boolean) searchField.get('isEncrypted');
+                    Boolean isPersonAccountField = (Boolean) searchField.get('isPersonAccountField');
+                    String condition = isEncrypted ? 
+                        (fieldName + ' = :searchTerm') : 
+                        (fieldName + ' LIKE :likePattern');
+                    
+                    if (isPersonAccountField) {
+                        personAccountSearchConditions.add(condition);
+                    } else {
+                        businessAccountSearchConditions.add(condition);
+                    }
                 }
-                whereConditions.add('(' + String.join(searchConditions, ' OR ') + ')');
+
+                // Combine search conditions with IsPersonAccount check
+                List<String> searchConditions = new List<String>();
+                if (!personAccountSearchConditions.isEmpty()) {
+                    searchConditions.add('(IsPersonAccount = true AND (' + String.join(personAccountSearchConditions, ' OR ') + '))');
+                }
+                if (!businessAccountSearchConditions.isEmpty()) {
+                    searchConditions.add('(IsPersonAccount = false AND (' + String.join(businessAccountSearchConditions, ' OR ') + '))');
+                }
+                if (!searchConditions.isEmpty()) {
+                    whereConditions.add('(' + String.join(searchConditions, ' OR ') + ')');
+                }
             }
 
             String whereClause = whereConditions.isEmpty() ? '' : ' WHERE ' + String.join(whereConditions, ' AND ');
 
+            String likePattern = '%' + (String.isNotBlank(searchTerm) ? searchTerm : '') + '%';
             return getRecordsWithQueryLocator(objectApiName, safeFields, whereClause, sortBy, configSortBy, 
-                                            pageSize, offset, queryLocatorId, likePattern);
+                                            pageSize, offset, queryLocatorId, likePattern, searchTerm);
 
         } catch (Exception e) {
             System.debug('Error in getRecords: ' + e.getMessage());
@@ -86,7 +113,8 @@ public with sharing class J_FAD_RecordDisplayController {
 
     private static RecordResponse getRecordsWithQueryLocator(String objectApiName, List<String> safeFields, 
                                                            String whereClause, String sortBy, String configSortBy,
-                                                           Integer pageSize, Integer offset, String queryLocatorId, String likePattern) {
+                                                           Integer pageSize, Integer offset, String queryLocatorId, 
+                                                           String likePattern, String searchTerm) {
         
         String query = 'SELECT ' + String.join(safeFields, ', ') + ' FROM ' + objectApiName + whereClause;
         
@@ -106,7 +134,12 @@ public with sharing class J_FAD_RecordDisplayController {
         if (String.isNotBlank(queryLocatorId) && queryLocatorCache.containsKey(queryLocatorId)) {
             queryLocator = queryLocatorCache.get(queryLocatorId);
         } else {
-            queryLocator = Database.getQueryLocator(query);
+            // Bind both likePattern and searchTerm for the query
+            queryLocator = Database.getQueryLocatorWithBinds(
+                query, 
+                new Map<String, Object>{ 'likePattern' => likePattern, 'searchTerm' => searchTerm }, 
+                AccessLevel.USER_MODE
+            );
             currentLocatorId = generateQueryLocatorId();
             queryLocatorCache.put(currentLocatorId, queryLocator);
         }
@@ -159,24 +192,40 @@ public with sharing class J_FAD_RecordDisplayController {
         
         for (Object fieldConfig : fieldsConfig) {
             String fieldName = '';
-            if (fieldConfig instanceof String) {
-                fieldName = (String) fieldConfig;
-            } else if (fieldConfig instanceof Map<String, Object>) {
+            // Handle section fields (e.g., Address Information)
+            if (fieldConfig instanceof Map<String, Object>) {
                 Map<String, Object> fieldMap2 = (Map<String, Object>) fieldConfig;
-                fieldName = (String) fieldMap2.get('fieldName');
-            }
-
-            if (String.isNotBlank(fieldName)) {
-                if (fieldName.contains('.')) {
-                    String[] parts = fieldName.split('\\.');
-                    if (parts.size() == 2) {
-                        String relationshipField = parts[0];
-                        if (relationshipField == 'RecordType' || relationshipField == 'Owner' ||
-                            relationshipField == 'CreatedBy' || relationshipField == 'LastModifiedBy') {
-                            safeFields.add(fieldName);
+                if (fieldMap2.containsKey('fields')) {
+                    // Process nested fields in a section
+                    List<Object> nestedFields = (List<Object>) fieldMap2.get('fields');
+                    for (Object nestedField : nestedFields) {
+                        if (nestedField instanceof Map<String, Object>) {
+                            fieldName = (String) ((Map<String, Object>) nestedField).get('fieldName');
+                            if (String.isNotBlank(fieldName)) {
+                                if (fieldName.contains('.')) {
+                                    String[] parts = fieldName.split('\\.');
+                                    if (parts.size() == 2) {
+                                        String relationshipField = parts[0];
+                                        if (relationshipField == 'RecordType' || relationshipField == 'Owner' ||
+                                            relationshipField == 'CreatedBy' || relationshipField == 'LastModifiedBy') {
+                                            safeFields.add(fieldName);
+                                        }
+                                    }
+                                } else if (fieldMap.containsKey(fieldName)) {
+                                    safeFields.add(fieldName);
+                                }
+                            }
                         }
                     }
-                } else if (fieldMap.containsKey(fieldName)) {
+                } else {
+                    fieldName = (String) fieldMap2.get('fieldName');
+                }
+            } else if (fieldConfig instanceof String) {
+                fieldName = (String) fieldConfig;
+            }
+
+            if (String.isNotBlank(fieldName) && !fieldName.contains('.')) {
+                if (fieldMap.containsKey(fieldName)) {
                     safeFields.add(fieldName);
                 }
             }
@@ -189,26 +238,65 @@ public with sharing class J_FAD_RecordDisplayController {
         return safeFields;
     }
 
-    private static List<String> buildSearchableFields(String objectApiName, List<Object> fieldsConfig) {
-    Schema.SObjectType sObjectType = Schema.getGlobalDescribe().get(objectApiName);
-    Map<String, Schema.SObjectField> fieldMap = sObjectType.getDescribe().fields.getMap();
+    private static List<Map<String, Object>> buildSearchableFields(String objectApiName, List<Object> fieldsConfig) {
+        Schema.SObjectType sObjectType = Schema.getGlobalDescribe().get(objectApiName);
+        Map<String, Schema.SObjectField> fieldMap = sObjectType.getDescribe().fields.getMap();
 
-    List<String> searchableFields = new List<String>();
+        List<Map<String, Object>> searchableFields = new List<Map<String, Object>>();
 
-    for (Object fieldConfig : fieldsConfig) {
-        String fieldName = '';
-        if (fieldConfig instanceof String) {
-            fieldName = (String) fieldConfig;
-        } else if (fieldConfig instanceof Map<String, Object>) {
-            Map<String, Object> fieldMap2 = (Map<String, Object>) fieldConfig;
-            fieldName = (String) fieldMap2.get('fieldName');
+        // Define Person Account-specific fields
+        Set<String> personAccountFields = new Set<String>{
+            'FirstName', 'LastName', 'PersonEmail', 'PersonHomePhone', 'PersonMailingStreet',
+            'PersonMailingCity', 'PersonMailingState', 'PersonMailingCountry', 'PersonMailingPostalCode'
+        };
+
+        for (Object fieldConfig : fieldsConfig) {
+            String fieldName = '';
+            Boolean isSectionField = false;
+
+            // Handle section fields (e.g., Address Information)
+            if (fieldConfig instanceof Map<String, Object>) {
+                Map<String, Object> fieldMap2 = (Map<String, Object>) fieldConfig;
+                if (fieldMap2.containsKey('fields')) {
+                    // Process nested fields in a section
+                    List<Object> nestedFields = (List<Object>) fieldMap2.get('fields');
+                    for (Object nestedField : nestedFields) {
+                        if (nestedField instanceof Map<String, Object>) {
+                            Map<String, Object> nestedFieldMap = (Map<String, Object>) nestedField;
+                            fieldName = (String) nestedFieldMap.get('fieldName');
+                            isSectionField = true;
+                            processField(fieldName, objectApiName, fieldMap, searchableFields, personAccountFields);
+                        }
+                    }
+                    continue;
+                } else {
+                    fieldName = (String) fieldMap2.get('fieldName');
+                }
+            } else if (fieldConfig instanceof String) {
+                fieldName = (String) fieldConfig;
+            }
+
+            if (!isSectionField && String.isNotBlank(fieldName)) {
+                processField(fieldName, objectApiName, fieldMap, searchableFields, personAccountFields);
+            }
         }
 
+        return searchableFields;
+    }
+
+    private static void processField(String fieldName, String objectApiName, Map<String, Schema.SObjectField> fieldMap, 
+                                    List<Map<String, Object>> searchableFields, Set<String> personAccountFields) {
         if (String.isNotBlank(fieldName)) {
+            Boolean isPersonAccountField = objectApiName == 'Account' && personAccountFields.contains(fieldName);
+            
             if (fieldName.contains('.')) {
                 // Handle related fields (e.g., RecordType.Name or Owner.Name)
                 if (fieldName.contains('Name') || fieldName.contains('DeveloperName')) {
-                    searchableFields.add(fieldName);
+                    searchableFields.add(new Map<String, Object>{
+                        'fieldName' => fieldName,
+                        'isEncrypted' => false,
+                        'isPersonAccountField' => false
+                    });
                 }
             } else if (fieldMap.containsKey(fieldName)) {
                 Schema.SObjectField field = fieldMap.get(fieldName);
@@ -223,17 +311,17 @@ public with sharing class J_FAD_RecordDisplayController {
                                      fieldType == Schema.DisplayType.PICKLIST ||
                                      fieldType == Schema.DisplayType.MULTIPICKLIST;
 
-                // Only include if filterable and not encrypted
-                if (isTextType && describe.isFilterable() && !describe.isEncrypted()) {
-                    searchableFields.add(fieldName);
+                // Only include if filterable
+                if (isTextType && describe.isFilterable()) {
+                    searchableFields.add(new Map<String, Object>{
+                        'fieldName' => fieldName,
+                        'isEncrypted' => describe.isEncrypted(),
+                        'isPersonAccountField' => isPersonAccountField
+                    });
                 }
             }
         }
     }
-
-    return searchableFields;
-}
-
 
     @AuraEnabled
     public static void cleanupQueryLocatorCache() {
