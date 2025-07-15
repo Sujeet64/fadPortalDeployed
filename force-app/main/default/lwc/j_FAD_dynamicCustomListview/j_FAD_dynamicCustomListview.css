@@ -341,7 +341,7 @@ input[type="search"]:focus {
 .mobile-card-container {
     display: none;
     flex-direction: column;
-    gap: 1rem;
+    gap: 1%;
     padding: 1rem;
     background: #f8f9fa;
     max-height: none;
@@ -632,6 +632,7 @@ input[placeholder*="Search" i]:focus {
     
     .search-controls {
         justify-content: space-between;
+        
     }
     
     .search-container {
@@ -708,6 +709,7 @@ input[placeholder*="Search" i]:focus {
     
     .search-controls {
         justify-content: space-between;
+        margin-top: -20px;
     }
     
     .search-container {
@@ -731,9 +733,7 @@ input[placeholder*="Search" i]:focus {
         padding: 0.25rem 0.5rem;
     }
     
-    .table-container {
-        display: none;
-    }
+
     
     .mobile-card-container {
         display: flex;
@@ -756,6 +756,9 @@ input[placeholder*="Search" i]:focus {
     .mobile-card-container[data-loading-type="infiniteScroll"] {
         max-height: none;
         height: auto;
+    }
+        .table-container {
+        display: none;
     }
 }
 

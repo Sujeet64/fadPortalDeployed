@@ -188,7 +188,8 @@ public with sharing class J_FAD_RecordDisplayController {
         Schema.SObjectType sObjectType = Schema.getGlobalDescribe().get(objectApiName);
         Map<String, Schema.SObjectField> fieldMap = sObjectType.getDescribe().fields.getMap();
         
-        List<String> safeFields = new List<String>();
+        // Use a Set to track unique fields and avoid duplicates
+        Set<String> uniqueFields = new Set<String>();
         
         for (Object fieldConfig : fieldsConfig) {
             String fieldName = '';
@@ -208,11 +209,11 @@ public with sharing class J_FAD_RecordDisplayController {
                                         String relationshipField = parts[0];
                                         if (relationshipField == 'RecordType' || relationshipField == 'Owner' ||
                                             relationshipField == 'CreatedBy' || relationshipField == 'LastModifiedBy') {
-                                            safeFields.add(fieldName);
+                                            uniqueFields.add(fieldName);
                                         }
                                     }
                                 } else if (fieldMap.containsKey(fieldName)) {
-                                    safeFields.add(fieldName);
+                                    uniqueFields.add(fieldName);
                                 }
                             }
                         }
@@ -226,16 +227,16 @@ public with sharing class J_FAD_RecordDisplayController {
 
             if (String.isNotBlank(fieldName) && !fieldName.contains('.')) {
                 if (fieldMap.containsKey(fieldName)) {
-                    safeFields.add(fieldName);
+                    uniqueFields.add(fieldName);
                 }
             }
         }
 
-        if (!safeFields.contains('Id')) {
-            safeFields.add('Id');
-        }
+        // Add Id if not already present
+        uniqueFields.add('Id');
         
-        return safeFields;
+        // Convert Set to List for SOQL
+        return new List<String>(uniqueFields);
     }
 
     private static List<Map<String, Object>> buildSearchableFields(String objectApiName, List<Object> fieldsConfig) {
