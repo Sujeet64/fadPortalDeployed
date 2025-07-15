@@ -283,6 +283,9 @@ export default class RecordListView extends NavigationMixin(LightningElement) {
             record.allFields = record.cells.slice(1);
         }
 
+        // Filter out null or empty fields
+        record.allFields = record.allFields.filter(cell => cell.value !== null && cell.value !== undefined && cell.value !== '');
+
         const visibleFieldsCount = this.config.visibleMobileFields || 2;
         record.visibleFields = (record.allFields || []).slice(0, visibleFieldsCount);
         record.hiddenFields = (record.allFields || []).slice(visibleFieldsCount);
@@ -295,7 +298,7 @@ export default class RecordListView extends NavigationMixin(LightningElement) {
             cell.fieldName.toLowerCase().includes('id') ||
             cell.fieldName.toLowerCase().includes('number')
         );
-        if (subtitleField) {
+        if (subtitleField && subtitleField.value) {
             record.subtitle = subtitleField.displayValue;
         }
     }
@@ -501,7 +504,7 @@ export default class RecordListView extends NavigationMixin(LightningElement) {
         return `${totalShown} items`;
     }
 
-    get sortInfoText() {
+    /*get sortInfoText() {
         if (this.sortField) return `Sorted by ${this.formatLabel(this.sortField)} ${this.sortDirection.toUpperCase()}`;
         return this.config.sortBy ? `Sorted by ${this.config.sortBy}` : 'Sorted by Name';
     }
@@ -527,7 +530,7 @@ export default class RecordListView extends NavigationMixin(LightningElement) {
         } else {
             return `Updated ${diffHours} hour${diffHours !== 1 ? 's' : ''} ago`;
         }
-    }
+    }*/
 
     get filteredRecords() {
         return this.displayedRecords;

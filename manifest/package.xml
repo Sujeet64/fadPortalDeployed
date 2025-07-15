@@ -9,17 +9,17 @@
 		<name>CustomField</name>
 	</types>
 	<types>
-		<members>J_FAD_Listview_RecordDisplayConfig.PatientList</members>
-		<members>J_FAD_Listview_RecordDisplayConfig.PharmacyList</members>
+		<members>J_FAD_Listview_RecordDisplayConfig.ConsentedPatient</members>
+		<members>J_FAD_Listview_RecordDisplayConfig.HCO</members>
+		<members>J_FAD_Listview_RecordDisplayConfig.HCP</members>
+		<members>J_FAD_Listview_RecordDisplayConfig.Payer</members>
+		<members>J_FAD_Listview_RecordDisplayConfig.Pharmacy</members>
+		<members>J_FAD_Listview_RecordDisplayConfig.UnconsentedPatient</members>
 		<name>CustomMetadata</name>
 	</types>
 	<types>
 		<members>J_FAD_Listview_RecordDisplayConfig__mdt</members>
 		<name>CustomObject</name>
-	</types>
-	<types>
-		<members>J_FAD_Listview_RecordDisplayConfig__mdt-RecordDisplayConfig Layout</members>
-		<name>Layout</name>
 	</types>
 	<types>
 		<members>j_FAD_dynamicCustomListview</members>

@@ -4,10 +4,10 @@
     border: 1px solid #c9c9c9;
     border-radius: 0.25rem;
     font-family: 'Salesforce Sans', Arial, sans-serif;
-    height: 100vh; /* FIXED: Set explicit height */
+    height: 100vh;
     display: flex;
     flex-direction: column;
-    overflow: hidden; /* FIXED: Prevent outer scroll */
+    overflow: hidden;
 }
 
 /* Header Section */
@@ -19,12 +19,13 @@
     justify-content: space-between;
     align-items: center;
     min-height: 3rem;
-    flex-shrink: 0; /* FIXED: Prevent header from shrinking */
+    flex-shrink: 0;
 }
 
 .list-title-section {
     display: flex;
-    align-items: center;
+    flex-direction: column;
+    align-items: flex-start;
 }
 
 .list-title {
@@ -47,6 +48,14 @@
 
 .title-edit {
     color: #5b5b5b;
+} 
+
+/* Item Count */
+.item-count {
+    font-size: 0.75rem;
+    color: #706e6b;
+    margin-top: 0.25rem;
+    line-height: 1.2;
 }
 
 /* Search and Controls */
@@ -72,11 +81,11 @@ input[type="search"] {
     border: 1px solid #c9c9c9;
     border-radius: 0.25rem;
     padding: 0.5rem 0.75rem;
-    font-size: 16px !important; /* CRITICAL: Prevents zoom on iOS/mobile devices */
+    font-size: 16px !important;
     background: #ffffff;
-    -webkit-appearance: none; /* Remove default iOS styling */
-    -moz-appearance: none; /* Remove default Firefox styling */
-    appearance: none; /* Remove default styling */
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
 }
 
 .search-input input:focus,
@@ -86,7 +95,7 @@ input[type="search"]:focus {
     border-color: #1589ee;
     box-shadow: 0 0 0 1px #1589ee;
     outline: none;
-    font-size: 16px !important; /* Maintain font size on focus */
+    font-size: 16px !important;
 }
 
 .control-buttons {
@@ -99,22 +108,22 @@ input[type="search"]:focus {
     border: 1px solid #c9c9c9;
     border-radius: 0.25rem;
     color: #5b5b5b;
-    padding: 0.5rem;
+    margin-top: 20px;
 }
 
 .control-button:hover {
     background: #f4f6f9;
 }
 
-/* Status Info Bar */
+/* Status Info Bar
 .status-info {
     background: #ffffff;
     border-bottom: 1px solid #c9c9c9;
     padding: 0.5rem 1rem;
     font-size: 0.75rem;
     color: #5b5b5b;
-    flex-shrink: 0; /* FIXED: Prevent shrinking */
-}
+    flex-shrink: 0; 
+} */
 
 .status-text {
     line-height: 1.25;
@@ -154,7 +163,7 @@ input[type="search"]:focus {
     border: 1px solid #c9c9c9;
     border-top: none;
     position: relative;
-    min-height: 0; /* FIXED: Allow flexbox to shrink */
+    min-height: 0;
 }
 
 .table-container[data-loading-type="infiniteScroll"] {
@@ -335,7 +344,6 @@ input[type="search"]:focus {
     gap: 1rem;
     padding: 1rem;
     background: #f8f9fa;
-    /* Remove max-height to allow natural scrolling */
     max-height: none;
     overflow-y: auto;
     overflow-x: hidden;
@@ -343,7 +351,6 @@ input[type="search"]:focus {
 }
 
 .mobile-card-container[data-loading-type="infiniteScroll"] {
-    /* Remove max-height restriction for infinite scroll */
     max-height: none;
     height: auto;
 }
@@ -388,6 +395,9 @@ input[type="search"]:focus {
     flex-grow: 1;
     margin-right: 0.5rem;
     line-height: 1.3;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .mobile-card-title:hover {
@@ -398,6 +408,9 @@ input[type="search"]:focus {
     font-size: 0.75rem;
     color: #666;
     font-weight: 400;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .mobile-card-content {
@@ -408,11 +421,9 @@ input[type="search"]:focus {
 
 .mobile-field-row {
     display: flex;
-    justify-content: space-between;
+    justify-content: flex-start;
     align-items: flex-start;
     min-height: 1.25rem;
-    padding: 0.25rem 0;
-    border-bottom: 1px solid #f8f9fa;
 }
 
 .mobile-field-row:last-child {
@@ -424,7 +435,7 @@ input[type="search"]:focus {
     color: #6b7280;
     font-weight: 500;
     flex-shrink: 0;
-    margin-right: 1rem;
+    margin-right: 0.5rem;
     min-width: 100px;
     text-transform: capitalize;
 }
@@ -432,11 +443,14 @@ input[type="search"]:focus {
 .mobile-field-value {
     font-size: 0.9rem;
     color: #1f2937;
-    text-align: right;
+    text-align: left;
     flex-grow: 1;
     word-wrap: break-word;
     line-height: 1.3;
     max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .mobile-field-value.is-link {
@@ -565,7 +579,6 @@ input[type="search"]:focus {
 }
 
 /* UNIVERSAL ZOOM PREVENTION - Applied to all screen sizes */
-/* Target all possible search input variations */
 .search-input input,
 .search-input lightning-input input,
 lightning-input[type="search"] input,
@@ -604,6 +617,19 @@ input[placeholder*="Search" i]:focus {
         align-items: stretch;
     }
     
+    .list-title-section {
+        align-items: flex-start;
+    }
+    
+    .list-title {
+        font-size: 1rem;
+    }
+    
+    .item-count {
+        font-size: 0.6875rem;
+        margin-top: 0.2rem;
+    }
+    
     .search-controls {
         justify-content: space-between;
     }
@@ -616,7 +642,6 @@ input[placeholder*="Search" i]:focus {
         width: 100%;
     }
     
-    /* ZOOM PREVENTION: Ensure 16px font size on mobile */
     .search-input input,
     .search-input lightning-input input,
     lightning-input[type="search"] input,
@@ -646,13 +671,25 @@ input[placeholder*="Search" i]:focus {
     .mobile-field-value {
         font-size: 0.85rem;
         max-width: 150px;
+        text-align: left;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
     }
     
     .mobile-card-title {
         font-size: 1rem;
     }
     
-    /* ZOOM PREVENTION: Maintain 16px font size on small mobile */
+    .list-title {
+        font-size: 0.875rem;
+    }
+    
+    .item-count {
+        font-size: 0.625rem;
+        margin-top: 0.15rem;
+    }
+    
     .search-input input,
     .search-input lightning-input input,
     lightning-input[type="search"] input,
@@ -682,12 +719,11 @@ input[placeholder*="Search" i]:focus {
         width: 100%;
     }
     
-    /* ZOOM PREVENTION: Critical for tablets and mobile */
     .search-input input,
     .search-input lightning-input input,
     lightning-input[type="search"] input,
     input[type="search"] {
-        font-size: 16px !important; /* Prevents zoom on iOS/mobile devices */
+        font-size: 16px !important;
     }
     
     .status-info {
@@ -695,7 +731,6 @@ input[placeholder*="Search" i]:focus {
         padding: 0.25rem 0.5rem;
     }
     
-    /* Hide table, show mobile cards */
     .table-container {
         display: none;
     }
@@ -708,6 +743,10 @@ input[placeholder*="Search" i]:focus {
         font-size: 1rem;
     }
     
+    .item-count {
+        font-size: 0.6875rem;
+    }
+    
     .control-buttons {
         flex-shrink: 0;
     }
@@ -715,11 +754,6 @@ input[placeholder*="Search" i]:focus {
 
 @media (max-width: 768px) {
     .mobile-card-container[data-loading-type="infiniteScroll"] {
-        max-height: 60vh;
-    }
-    
-    .mobile-card-container[data-loading-type="infiniteScroll"] {
-        /* Remove max-height restriction for mobile infinite scroll */
         max-height: none;
         height: auto;
     }
@@ -750,6 +784,10 @@ input[placeholder*="Search" i]:focus {
     .mobile-field-value {
         font-size: 0.95rem;
         max-width: 250px;
+        text-align: left;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
     }
     
     .mobile-card-container {
@@ -767,7 +805,14 @@ input[placeholder*="Search" i]:focus {
         font-size: 0.9rem;
     }
     
-    /* ZOOM PREVENTION: Maintain 16px font size on tablets */
+    .list-title {
+        font-size: 1.125rem;
+    }
+    
+    .item-count {
+        font-size: 0.75rem;
+    }
+    
     .search-input input,
     .search-input lightning-input input,
     lightning-input[type="search"] input,
@@ -786,7 +831,6 @@ input[placeholder*="Search" i]:focus {
         display: none;
     }
     
-    /* ZOOM PREVENTION: Even on desktop, maintain consistency */
     .search-input input,
     .search-input lightning-input input,
     lightning-input[type="search"] input,
@@ -811,12 +855,10 @@ input[placeholder*="Search" i]:focus {
 }
 
 /* ADDITIONAL ZOOM PREVENTION LAYER */
-/* Target Lightning Web Component shadow DOM elements */
 :host {
     --lwc-fontSize: 16px;
 }
 
-/* Prevent zoom on any input within the component */
 * input[type="search"],
 * input[type="text"] {
     font-size: 16px !important;
@@ -826,14 +868,12 @@ input[placeholder*="Search" i]:focus {
     text-size-adjust: 100% !important;
 }
 
-/* Force font size on Lightning components */
 lightning-input,
 lightning-input input,
 .slds-input {
     font-size: 16px !important;
 }
 
-/* Specific targeting for search inputs */
 [data-id="search-input"] input,
 [data-id="search-input"] lightning-input input,
 .search-input [part="input"],

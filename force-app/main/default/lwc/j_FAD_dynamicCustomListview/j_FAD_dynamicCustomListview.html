@@ -1,18 +1,19 @@
 <!--
-  @description       : Lightning Web Component for displaying a list of records with lazy loading and infinite scrolling
+  @description       : 
   @author            : ChangeMeIn@UserSettingsUnder.SFDoc
   @group             : 
-  @last modified on  : 07-11-2025
+  @last modified on  : 07-15-2025
   @last modified by  : ChangeMeIn@UserSettingsUnder.SFDoc
 -->
 <template>
-    <div class="list-view-container">
+     <div class="list-view-container">
         <!-- Header Section -->
         <div class="list-header">
             <div class="list-title-section">
                 <h1 class="list-title">
                     <span class="title-text">{listTitle}</span>
                 </h1>
+                <div class="item-count">{itemsDisplayText}</div>
             </div>
 
             <!-- Search and Controls -->
@@ -39,12 +40,12 @@
             </div>
         </div>
 
-        <!-- Status Info Bar -->
+        <!-- Status Info Bar 
         <div class="status-info">
             <span class="status-text">
                 {itemsDisplayText} • {sortInfoText} • {filterInfoText} • {updateInfoText}
             </span>
-        </div>
+        </div> -->
 
         <!-- Initial Loading Spinner -->
         <template if:true={isLoading}>
