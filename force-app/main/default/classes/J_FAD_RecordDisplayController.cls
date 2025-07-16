@@ -17,7 +17,7 @@ public with sharing class J_FAD_RecordDisplayController {
     private static Map<String, Database.QueryLocator> queryLocatorCache = new Map<String, Database.QueryLocator>();
     
     @AuraEnabled(cacheable=false)
-    public static RecordResponse getRecords(String configName, Integer pageSize, Integer offset, String searchTerm, String sortBy, String queryLocatorId) {
+    public static RecordResponse getRecords(String configName, Integer pageSize, Integer offset, String searchTerm, String queryLocatorId) {
         try {
             if (String.isBlank(configName)) {
                 throw new AuraHandledException('Configuration name is required.');
@@ -44,7 +44,6 @@ public with sharing class J_FAD_RecordDisplayController {
             String recordType = (String) configData.get('recordType');
             Boolean isActive = (Boolean) configData.get('isActive');
             List<Object> fieldsConfig = (List<Object>) configData.get('fields');
-            String configSortBy = (String) configData.get('sortBy');
             Integer configPageSize = configData.containsKey('pageSize') ? (Integer) configData.get('pageSize') : 20;
 
             pageSize = pageSize != null ? pageSize : configPageSize;
@@ -55,7 +54,6 @@ public with sharing class J_FAD_RecordDisplayController {
             }
 
             List<String> safeFields = buildSafeFields(objectApiName, fieldsConfig);
-            // Ensure IsPersonAccount is included in the query for Account object
             if (objectApiName == 'Account' && !safeFields.contains('IsPersonAccount')) {
                 safeFields.add('IsPersonAccount');
             }
@@ -85,7 +83,6 @@ public with sharing class J_FAD_RecordDisplayController {
                     }
                 }
 
-                // Combine search conditions with IsPersonAccount check
                 List<String> searchConditions = new List<String>();
                 if (!personAccountSearchConditions.isEmpty()) {
                     searchConditions.add('(IsPersonAccount = true AND (' + String.join(personAccountSearchConditions, ' OR ') + '))');
@@ -101,8 +98,7 @@ public with sharing class J_FAD_RecordDisplayController {
             String whereClause = whereConditions.isEmpty() ? '' : ' WHERE ' + String.join(whereConditions, ' AND ');
 
             String likePattern = '%' + (String.isNotBlank(searchTerm) ? searchTerm : '') + '%';
-            return getRecordsWithQueryLocator(objectApiName, safeFields, whereClause, sortBy, configSortBy, 
-                                            pageSize, offset, queryLocatorId, likePattern, searchTerm);
+            return getRecordsWithQueryLocator(objectApiName, safeFields, whereClause, pageSize, offset, queryLocatorId, likePattern, searchTerm);
 
         } catch (Exception e) {
             System.debug('Error in getRecords: ' + e.getMessage());
@@ -112,19 +108,10 @@ public with sharing class J_FAD_RecordDisplayController {
     }
 
     private static RecordResponse getRecordsWithQueryLocator(String objectApiName, List<String> safeFields, 
-                                                           String whereClause, String sortBy, String configSortBy,
-                                                           Integer pageSize, Integer offset, String queryLocatorId, 
-                                                           String likePattern, String searchTerm) {
+                                                           String whereClause, Integer pageSize, Integer offset, 
+                                                           String queryLocatorId, String likePattern, String searchTerm) {
         
         String query = 'SELECT ' + String.join(safeFields, ', ') + ' FROM ' + objectApiName + whereClause;
-        
-        String finalSortBy = String.isNotBlank(sortBy) ? sortBy : (String.isNotBlank(configSortBy) ? configSortBy : 'Name ASC');
-        if (String.isNotBlank(finalSortBy)) {
-            String sortField = finalSortBy.split(' ')[0];
-            if (safeFields.contains(sortField) || sortField.contains('.')) {
-                //query += ' ORDER BY ' + finalSortBy;
-            }
-        }
         
         System.debug('QueryLocator Query: ' + query);
         
@@ -134,7 +121,6 @@ public with sharing class J_FAD_RecordDisplayController {
         if (String.isNotBlank(queryLocatorId) && queryLocatorCache.containsKey(queryLocatorId)) {
             queryLocator = queryLocatorCache.get(queryLocatorId);
         } else {
-            // Bind both likePattern and searchTerm for the query
             queryLocator = Database.getQueryLocatorWithBinds(
                 query, 
                 new Map<String, Object>{ 'likePattern' => likePattern, 'searchTerm' => searchTerm }, 
@@ -176,7 +162,7 @@ public with sharing class J_FAD_RecordDisplayController {
             return Database.countQuery(countQuery);
         } catch (Exception e) {
             System.debug('Count query failed: ' + e.getMessage());
-            return 50000; // Return max estimate
+            return 50000;
         }
     }
 
@@ -188,16 +174,13 @@ public with sharing class J_FAD_RecordDisplayController {
         Schema.SObjectType sObjectType = Schema.getGlobalDescribe().get(objectApiName);
         Map<String, Schema.SObjectField> fieldMap = sObjectType.getDescribe().fields.getMap();
         
-        // Use a Set to track unique fields and avoid duplicates
         Set<String> uniqueFields = new Set<String>();
         
         for (Object fieldConfig : fieldsConfig) {
             String fieldName = '';
-            // Handle section fields (e.g., Address Information)
             if (fieldConfig instanceof Map<String, Object>) {
                 Map<String, Object> fieldMap2 = (Map<String, Object>) fieldConfig;
                 if (fieldMap2.containsKey('fields')) {
-                    // Process nested fields in a section
                     List<Object> nestedFields = (List<Object>) fieldMap2.get('fields');
                     for (Object nestedField : nestedFields) {
                         if (nestedField instanceof Map<String, Object>) {
@@ -232,10 +215,8 @@ public with sharing class J_FAD_RecordDisplayController {
             }
         }
 
-        // Add Id if not already present
         uniqueFields.add('Id');
         
-        // Convert Set to List for SOQL
         return new List<String>(uniqueFields);
     }
 
@@ -245,7 +226,6 @@ public with sharing class J_FAD_RecordDisplayController {
 
         List<Map<String, Object>> searchableFields = new List<Map<String, Object>>();
 
-        // Define Person Account-specific fields
         Set<String> personAccountFields = new Set<String>{
             'FirstName', 'LastName', 'PersonEmail', 'PersonHomePhone', 'PersonMailingStreet',
             'PersonMailingCity', 'PersonMailingState', 'PersonMailingCountry', 'PersonMailingPostalCode'
@@ -255,11 +235,9 @@ public with sharing class J_FAD_RecordDisplayController {
             String fieldName = '';
             Boolean isSectionField = false;
 
-            // Handle section fields (e.g., Address Information)
             if (fieldConfig instanceof Map<String, Object>) {
                 Map<String, Object> fieldMap2 = (Map<String, Object>) fieldConfig;
                 if (fieldMap2.containsKey('fields')) {
-                    // Process nested fields in a section
                     List<Object> nestedFields = (List<Object>) fieldMap2.get('fields');
                     for (Object nestedField : nestedFields) {
                         if (nestedField instanceof Map<String, Object>) {
@@ -291,7 +269,6 @@ public with sharing class J_FAD_RecordDisplayController {
             Boolean isPersonAccountField = objectApiName == 'Account' && personAccountFields.contains(fieldName);
             
             if (fieldName.contains('.')) {
-                // Handle related fields (e.g., RecordType.Name or Owner.Name)
                 if (fieldName.contains('Name') || fieldName.contains('DeveloperName')) {
                     searchableFields.add(new Map<String, Object>{
                         'fieldName' => fieldName,
@@ -312,7 +289,6 @@ public with sharing class J_FAD_RecordDisplayController {
                                      fieldType == Schema.DisplayType.PICKLIST ||
                                      fieldType == Schema.DisplayType.MULTIPICKLIST;
 
-                // Only include if filterable
                 if (isTextType && describe.isFilterable()) {
                     searchableFields.add(new Map<String, Object>{
                         'fieldName' => fieldName,
