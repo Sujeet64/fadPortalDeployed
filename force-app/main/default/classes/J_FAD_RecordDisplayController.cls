@@ -185,59 +185,79 @@ public with sharing class J_FAD_RecordDisplayController {
     }
 
     private static List<String> buildSafeFields(String objectApiName, List<Object> fieldsConfig) {
-        Schema.SObjectType sObjectType = Schema.getGlobalDescribe().get(objectApiName);
-        Map<String, Schema.SObjectField> fieldMap = sObjectType.getDescribe().fields.getMap();
-        
-        // Use a Set to track unique fields and avoid duplicates
-        Set<String> uniqueFields = new Set<String>();
-        
-        for (Object fieldConfig : fieldsConfig) {
-            String fieldName = '';
-            // Handle section fields (e.g., Address Information)
-            if (fieldConfig instanceof Map<String, Object>) {
-                Map<String, Object> fieldMap2 = (Map<String, Object>) fieldConfig;
-                if (fieldMap2.containsKey('fields')) {
-                    // Process nested fields in a section
-                    List<Object> nestedFields = (List<Object>) fieldMap2.get('fields');
-                    for (Object nestedField : nestedFields) {
-                        if (nestedField instanceof Map<String, Object>) {
-                            fieldName = (String) ((Map<String, Object>) nestedField).get('fieldName');
-                            if (String.isNotBlank(fieldName)) {
-                                if (fieldName.contains('.')) {
-                                    String[] parts = fieldName.split('\\.');
-                                    if (parts.size() == 2) {
-                                        String relationshipField = parts[0];
-                                        if (relationshipField == 'RecordType' || relationshipField == 'Owner' ||
-                                            relationshipField == 'CreatedBy' || relationshipField == 'LastModifiedBy') {
-                                            uniqueFields.add(fieldName);
+    Schema.SObjectType sObjectType = Schema.getGlobalDescribe().get(objectApiName);
+    Map<String, Schema.SObjectField> fieldMap = sObjectType.getDescribe().fields.getMap();
+    
+    List<String> safeFields = new List<String>();
+    Set<String> addedFields = new Set<String>(); // Track added fields to prevent duplicates
+    
+    for (Object fieldConfig : fieldsConfig) {
+        String fieldName = '';
+        // Handle section fields (e.g., Address Information)
+        if (fieldConfig instanceof Map<String, Object>) {
+            Map<String, Object> fieldMap2 = (Map<String, Object>) fieldConfig;
+            if (fieldMap2.containsKey('fields')) {
+                // Process nested fields in a section
+                List<Object> nestedFields = (List<Object>) fieldMap2.get('fields');
+                for (Object nestedField : nestedFields) {
+                    if (nestedField instanceof Map<String, Object>) {
+                        fieldName = (String) ((Map<String, Object>) nestedField).get('fieldName');
+                        if (String.isNotBlank(fieldName)) {
+                            if (fieldName.contains('.')) {
+                                String[] parts = fieldName.split('\\.');
+                                if (parts.size() == 2) {
+                                    String relationshipField = parts[0];
+                                    if (relationshipField == 'RecordType' || relationshipField == 'Owner' ||
+                                        relationshipField == 'CreatedBy' || relationshipField == 'LastModifiedBy') {
+                                        if (!addedFields.contains(fieldName)) {
+                                            safeFields.add(fieldName);
+                                            addedFields.add(fieldName);
                                         }
                                     }
-                                } else if (fieldMap.containsKey(fieldName)) {
-                                    uniqueFields.add(fieldName);
+                                }
+                            } else if (fieldMap.containsKey(fieldName)) {
+                                if (!addedFields.contains(fieldName)) {
+                                    safeFields.add(fieldName);
+                                    addedFields.add(fieldName);
                                 }
                             }
                         }
                     }
-                } else {
-                    fieldName = (String) fieldMap2.get('fieldName');
                 }
-            } else if (fieldConfig instanceof String) {
-                fieldName = (String) fieldConfig;
+            } else {
+                fieldName = (String) fieldMap2.get('fieldName');
+                // Process regular field from map
+                if (String.isNotBlank(fieldName) && !fieldName.contains('.')) {
+                    if (fieldMap.containsKey(fieldName)) {
+                        if (!addedFields.contains(fieldName)) {
+                            safeFields.add(fieldName);
+                            addedFields.add(fieldName);
+                        }
+                    }
+                }
             }
-
+        } else if (fieldConfig instanceof String) {
+            fieldName = (String) fieldConfig;
+            // Process regular field from string
             if (String.isNotBlank(fieldName) && !fieldName.contains('.')) {
                 if (fieldMap.containsKey(fieldName)) {
-                    uniqueFields.add(fieldName);
+                    if (!addedFields.contains(fieldName)) {
+                        safeFields.add(fieldName);
+                        addedFields.add(fieldName);
+                    }
                 }
             }
         }
-
-        // Add Id if not already present
-        uniqueFields.add('Id');
-        
-        // Convert Set to List for SOQL
-        return new List<String>(uniqueFields);
     }
+
+    // Ensure Id is included
+    if (!addedFields.contains('Id')) {
+        safeFields.add('Id');
+        addedFields.add('Id');
+    }
+    
+    return safeFields;
+}
 
     private static List<Map<String, Object>> buildSearchableFields(String objectApiName, List<Object> fieldsConfig) {
         Schema.SObjectType sObjectType = Schema.getGlobalDescribe().get(objectApiName);

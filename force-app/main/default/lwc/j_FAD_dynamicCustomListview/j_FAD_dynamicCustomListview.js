@@ -1,4 +1,4 @@
-import { LightningElement, track, wire } from 'lwc';
+import { LightningElement, track } from 'lwc';
 import { ShowToastEvent } from 'lightning/platformShowToastEvent';
 import { NavigationMixin } from 'lightning/navigation';
 import { CurrentPageReference } from 'lightning/navigation';
@@ -36,16 +36,20 @@ export default class RecordListView extends NavigationMixin(LightningElement) {
     containerHeight = 0;
 
     connectedCallback() {
+        // Get the current page reference to extract URL information
         this.getCurrentPageReference();
     }
 
     getCurrentPageReference() {
+        // Get current page reference using NavigationMixin
         const pageRef = this[NavigationMixin.GenerateUrl]({
             type: 'standard__webPage',
             attributes: {
                 url: window.location.href
             }
         });
+        
+        // Extract the page name from URL
         this.extractConfigNameFromUrl();
         this.loadConfig();
     }
@@ -54,19 +58,30 @@ export default class RecordListView extends NavigationMixin(LightningElement) {
         try {
             const url = window.location.href;
             console.log('Current URL:', url);
+            
+            // Extract the page name from the URL
+            // For URL like: https://vhslscci-dev-ed.develop.my.site.com/frmportal/s/PharmarcyList
             const urlParts = url.split('/');
             const pageName = urlParts[urlParts.length - 1];
+            
+            // Remove any query parameters
             const cleanPageName = pageName.split('?')[0];
+            
             console.log('Extracted page name:', cleanPageName);
+            
+            // Set the config name based on the page name
+            // You can customize this logic based on your naming convention
             if (cleanPageName && cleanPageName !== 's') {
                 this.configName = cleanPageName;
             } else {
+                // Fallback to default config name
                 this.configName = 'Pharmacy';
             }
+            
             console.log('Config name set to:', this.configName);
         } catch (error) {
             console.error('Error extracting config name from URL:', error);
-            this.configName = 'Pharmacy';
+            this.configName = 'Pharmacy'; // Fallback
         }
     }
 
@@ -78,7 +93,9 @@ export default class RecordListView extends NavigationMixin(LightningElement) {
         this.removeScrollListeners();
         if (this.queryLocatorId) {
             cleanupQueryLocatorCache()
-                .catch(error => console.warn('Could not cleanup QueryLocator cache:', error));
+                .catch(error => {
+                    console.warn('Could not cleanup QueryLocator cache:', error);
+                });
         }
     }
 
@@ -88,6 +105,7 @@ export default class RecordListView extends NavigationMixin(LightningElement) {
             tableContainer.addEventListener('scroll', this.handleScroll.bind(this));
             tableContainer.hasScrollListener = true;
         }
+
         const mobileContainer = this.template.querySelector('.mobile-card-container');
         if (mobileContainer && !mobileContainer.hasScrollListener) {
             mobileContainer.addEventListener('scroll', this.handleScroll.bind(this));
@@ -101,6 +119,7 @@ export default class RecordListView extends NavigationMixin(LightningElement) {
             tableContainer.removeEventListener('scroll', this.handleScroll.bind(this));
             tableContainer.hasScrollListener = false;
         }
+
         const mobileContainer = this.template.querySelector('.mobile-card-container');
         if (mobileContainer) {
             mobileContainer.removeEventListener('scroll', this.handleScroll.bind(this));
@@ -112,8 +131,13 @@ export default class RecordListView extends NavigationMixin(LightningElement) {
         try {
             console.log('Loading config with name:', this.configName);
             this.config = await getConfig({ configName: this.configName });
+            
+            // Set list title from config or generate from object name
             this.listTitle = this.config.listTitle || 
-                (this.config.recordType ? `${this.config.recordType} ${this.config.objectApiName}s` : `${this.config.objectApiName}s`);
+                (this.config.recordType ? 
+                    `${this.config.recordType} ${this.config.objectApiName}s` : 
+                    `${this.config.objectApiName}s`);
+            
             this.pageSize = this.config.pageSize || 20;
             this.loadingType = this.config.loadingType || 'infiniteScroll';
             this.setupColumns();
@@ -144,6 +168,7 @@ export default class RecordListView extends NavigationMixin(LightningElement) {
                 this.isLoadingMore = true;
                 this.isScrollLoading = true;
             }
+
             this.error = undefined;
 
             const sortBy = this.sortField ? `${this.sortField} ${this.sortDirection.toUpperCase()}` : this.config.sortBy;
@@ -168,18 +193,7 @@ export default class RecordListView extends NavigationMixin(LightningElement) {
 
                 if (this.columns && this.columns.length > 0) {
                     this.columns.forEach(column => {
-                        let fieldValue = this.getFieldValue(record, column.fieldName);
-                        // Use Name field for Accounts and Contacts, combining FirstName and LastName if Name is null
-                        if (column.fieldName === 'Name' && (this.config.objectApiName === 'Account' || this.config.objectApiName === 'Contact')) {
-                            const nameValue = this.getFieldValue(record, 'Name') || '';
-                            if (!nameValue) {
-                                const firstName = this.getFieldValue(record, 'FirstName') || '';
-                                const lastName = this.getFieldValue(record, 'LastName') || '';
-                                fieldValue = firstName && lastName ? `${firstName} ${lastName}` : firstName || lastName || nameValue;
-                            } else {
-                                fieldValue = nameValue;
-                            }
-                        }
+                        const fieldValue = this.getFieldValue(record, column.fieldName);
                         mappedRecord.cells.push({
                             fieldName: column.fieldName,
                             label: column.label,
@@ -228,76 +242,36 @@ export default class RecordListView extends NavigationMixin(LightningElement) {
 
     setupColumns() {
         if (this.config.fields && this.config.fields.length > 0) {
-            const columns = [];
-            const isAccountOrContact = this.config.objectApiName === 'Account' || this.config.objectApiName === 'Contact';
-
-            // Always add Name column for Account or Contact objects
-            if (isAccountOrContact) {
-                columns.push({
-                    label: 'Name',
-                    fieldName: 'Name',
-                    sortable: true,
-                    isLink: true, // Default to true for Name, can be overridden by JSON
-                    type: 'text',
-                    sortIcon: 'utility:arrowdown'
-                });
-            }
-
-            // Process JSON fields, skipping FirstName, LastName, and Name if already added
-            this.config.fields.forEach(fieldConfig => {
+            this.columns = this.config.fields.map(fieldConfig => {
                 if (typeof fieldConfig === 'string') {
-                    if (isAccountOrContact && (fieldConfig === 'FirstName' || fieldConfig === 'LastName' || fieldConfig === 'Name')) {
-                        return; // Skip FirstName, LastName, and Name
-                    }
-                    columns.push({
+                    return {
                         label: this.formatLabel(fieldConfig),
                         fieldName: fieldConfig,
                         sortable: true,
                         isLink: this.isLinkField(fieldConfig),
                         type: 'text',
                         sortIcon: 'utility:arrowdown'
-                    });
+                    };
                 } else if (typeof fieldConfig === 'object' && fieldConfig.fieldName) {
-                    if (isAccountOrContact && (fieldConfig.fieldName === 'FirstName' || fieldConfig.fieldName === 'LastName' || fieldConfig.fieldName === 'Name')) {
-                        return; // Skip FirstName, LastName, and Name
-                    }
-                    columns.push({
+                    return {
                         label: fieldConfig.label || this.formatLabel(fieldConfig.fieldName),
                         fieldName: fieldConfig.fieldName,
                         sortable: fieldConfig.sortable !== false,
                         isLink: fieldConfig.isLink || false,
                         type: fieldConfig.type || 'text',
                         sortIcon: 'utility:arrowdown'
-                    });
-                } else if (typeof fieldConfig === 'object' && fieldConfig.sectionLabel && fieldConfig.fields) {
-                    fieldConfig.fields.forEach(nestedField => {
-                        if (typeof nestedField === 'object' && nestedField.fieldName) {
-                            if (isAccountOrContact && (nestedField.fieldName === 'FirstName' || nestedField.fieldName === 'LastName' || nestedField.fieldName === 'Name')) {
-                                return; // Skip FirstName, LastName, and Name
-                            }
-                            columns.push({
-                                label: nestedField.label || this.formatLabel(nestedField.fieldName),
-                                fieldName: nestedField.fieldName,
-                                sortable: nestedField.sortable !== false,
-                                isLink: nestedField.isLink || false,
-                                type: nestedField.type || 'text',
-                                sortIcon: 'utility:arrowdown'
-                            });
-                        }
-                    });
+                    };
                 }
-            });
-
-            this.columns = columns.filter(col => col && col.fieldName);
+            }).filter(col => col && col.fieldName);
         }
     }
 
     setupMobileFields(record) {
         if (!record.cells || record.cells.length === 0) return;
 
-        const primaryFieldIndex = record.cells.findIndex(cell => 
-            cell.fieldName === 'Name' || 
-            cell.fieldName.toLowerCase().includes('title') || 
+        const primaryFieldIndex = record.cells.findIndex(cell =>
+            cell.fieldName.toLowerCase().includes('name') ||
+            cell.fieldName.toLowerCase().includes('title') ||
             cell.fieldName.toLowerCase().includes('subject')
         );
 
@@ -309,6 +283,7 @@ export default class RecordListView extends NavigationMixin(LightningElement) {
             record.allFields = record.cells.slice(1);
         }
 
+        // Filter out null or empty fields
         record.allFields = record.allFields.filter(cell => cell.value !== null && cell.value !== undefined && cell.value !== '');
 
         const visibleFieldsCount = this.config.visibleMobileFields || 2;
@@ -330,7 +305,11 @@ export default class RecordListView extends NavigationMixin(LightningElement) {
 
     handleSearch(event) {
         const newSearchTerm = event.target.value;
-        if (this.searchTimeout) clearTimeout(this.searchTimeout);
+        
+        if (this.searchTimeout) {
+            clearTimeout(this.searchTimeout);
+        }
+
         this.searchTimeout = setTimeout(() => {
             if (this.searchTerm !== newSearchTerm) {
                 this.searchTerm = newSearchTerm;
@@ -349,12 +328,14 @@ export default class RecordListView extends NavigationMixin(LightningElement) {
             this.sortField = fieldName;
             this.sortDirection = 'asc';
         }
+        
         this.columns = this.columns.map(col => ({
             ...col,
             sortIcon: col.fieldName === this.sortField 
                 ? (this.sortDirection === 'asc' ? 'utility:arrowup' : 'utility:arrowdown')
                 : 'utility:arrowdown'
         }));
+        
         this.queryLocatorId = null;
         this.expandedCardIds.clear();
         this.loadRecords(true);
@@ -368,48 +349,29 @@ export default class RecordListView extends NavigationMixin(LightningElement) {
     }
 
     handleRowClick(event) {
-    const recordId = event.currentTarget.dataset.id;
-    const fieldName = event.currentTarget.dataset.field;
-
-    // Fallback to old behavior if fieldName or columns are not available
-    if (!fieldName || !this.columns || this.columns.length === 0) {
-        console.warn('Field name or columns not available, proceeding with navigation');
+        const recordId = event.currentTarget.dataset.id;
         this[NavigationMixin.Navigate]({
             type: 'standard__webPage',
             attributes: {
                 url: `/frmportal/s/recorddetailpage?recordId=${recordId}`
             }
         });
-        return;
     }
-
-    const column = this.columns.find(col => col.fieldName === fieldName);
-    if (column && column.isLink) {
-        try {
-            this[NavigationMixin.Navigate]({
-                type: 'standard__webPage',
-                attributes: {
-                    url: `/frmportal/s/recorddetailpage?recordId=${recordId}`
-                }
-            });
-        } catch (error) {
-            console.error('Navigation error:', error);
-            this.showToast('Error', 'Failed to navigate to record page.', 'error');
-        }
-    } else {
-        console.log('Field is not a link or column not found:', fieldName);
-    }
-}
 
     handleCardExpand(event) {
         event.stopPropagation();
         const recordId = event.currentTarget.dataset.id;
-        if (!this.config.isExpandable) return;
+        
+        if (!this.config.isExpandable) {
+            return;
+        }
+        
         if (this.expandedCardIds.has(recordId)) {
             this.expandedCardIds.delete(recordId);
         } else {
             this.expandedCardIds.add(recordId);
         }
+        
         this.displayedRecords = this.displayedRecords.map(record => ({
             ...record,
             isExpanded: this.expandedCardIds.has(record.Id)
@@ -417,11 +379,15 @@ export default class RecordListView extends NavigationMixin(LightningElement) {
     }
 
     handleScroll(event) {
-        if (!this.hasMoreRecords || this.isScrollLoading || this.isLoadingMore) return;
+        if (!this.hasMoreRecords || this.isScrollLoading || this.isLoadingMore) {
+            return;
+        }
+
         const target = event.target;
         const scrollTop = target.scrollTop;
         const scrollHeight = target.scrollHeight;
         const clientHeight = target.clientHeight;
+        
         if (scrollTop + clientHeight >= scrollHeight - this.scrollThreshold) {
             this.loadRecords(false);
         }
@@ -429,6 +395,7 @@ export default class RecordListView extends NavigationMixin(LightningElement) {
 
     getFieldValue(record, fieldName) {
         if (!record || !fieldName) return '';
+
         try {
             if (fieldName.includes('.')) {
                 const parts = fieldName.split('.');
@@ -439,6 +406,7 @@ export default class RecordListView extends NavigationMixin(LightningElement) {
                 }
                 return value != null ? String(value) : '';
             }
+
             return record[fieldName] != null ? String(record[fieldName]) : '';
         } catch (error) {
             return '';
@@ -447,6 +415,7 @@ export default class RecordListView extends NavigationMixin(LightningElement) {
 
     formatDisplayValue(value, column) {
         if (!value) return '';
+
         try {
             switch (column.type) {
                 case 'currency': return this.formatCurrency(value);
@@ -528,8 +497,40 @@ export default class RecordListView extends NavigationMixin(LightningElement) {
     get itemsDisplayText() {
         const totalShown = this.displayedRecords.length;
         const totalAvailable = this.config.totalCount || totalShown;
-        return this.hasMoreRecords ? `${totalShown}+ items` : `${totalShown} items`;
+        
+        if (this.hasMoreRecords) {
+            return `${totalShown}+ items`;
+        }
+        return `${totalShown} items`;
     }
+
+    /*get sortInfoText() {
+        if (this.sortField) return `Sorted by ${this.formatLabel(this.sortField)} ${this.sortDirection.toUpperCase()}`;
+        return this.config.sortBy ? `Sorted by ${this.config.sortBy}` : 'Sorted by Name';
+    }
+
+    get filterInfoText() {
+        let filterText = `Filtered by All ${this.config.objectApiName}s`;
+        if (this.config.recordType) filterText += ` - ${this.config.recordType} Record Type`;
+        return filterText;
+    }
+
+    get updateInfoText() {
+        if (!this.lastUpdateTime) return 'Never updated';
+        const now = new Date();
+        const diffMs = now - this.lastUpdateTime;
+        const diffSeconds = Math.floor(diffMs / 1000);
+        const diffMinutes = Math.floor(diffSeconds / 60);
+        const diffHours = Math.floor(diffMinutes / 60);
+
+        if (diffSeconds < 60) {
+            return `Updated ${diffSeconds} second${diffSeconds !== 1 ? 's' : ''} ago`;
+        } else if (diffMinutes < 60) {
+            return `Updated ${diffMinutes} minute${diffMinutes !== 1 ? 's' : ''} ago`;
+        } else {
+            return `Updated ${diffHours} hour${diffHours !== 1 ? 's' : ''} ago`;
+        }
+    }*/
 
     get filteredRecords() {
         return this.displayedRecords;
