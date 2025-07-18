@@ -2,46 +2,43 @@
   @description       : 
   @author            : ChangeMeIn@UserSettingsUnder.SFDoc
   @group             : 
-  @last modified on  : 07-16-2025
+  @last modified on  : 07-17-2025
   @last modified by  : ChangeMeIn@UserSettingsUnder.SFDoc
 -->
 <template>
      <div class="list-view-container">
         <!-- Header Section -->
         <div class="list-header">
-    <div class="list-title-section">
-        <h1 class="list-title">
-            <span class="title-text">{listTitle}</span>
-            <!-- Item count moved here for mobile/tablet -->
-            <div class="item-count mobile-item-count">{itemsDisplayText}</div>
-        </h1>
-        <!-- Keep original item count for desktop -->
-        <div class="item-count desktop-item-count">{itemsDisplayText}</div>
-    </div>
+            <div class="list-title-section">
+                <h1 class="list-title">
+                    <span class="title-text">{listTitle}</span>
+                </h1>
+                <div class="item-count">{itemsDisplayText}</div>
+            </div>
 
-    <!-- Search and Controls -->
-    <div class="search-controls">
-        <div class="search-container">
-            <lightning-input
-                type="search"
-                placeholder="Search this list..."
-                value={searchTerm}
-                onchange={handleSearch}
-                class="search-input">
-            </lightning-input>
+            <!-- Search and Controls -->
+            <div class="search-controls">
+                <div class="search-container">
+                    <lightning-input
+                        type="search"
+                        placeholder="Search this list..."
+                        value={searchTerm}
+                        onchange={handleSearch}
+                        class="search-input">
+                    </lightning-input>
+                </div>
+                
+                <div class="control-buttons">
+                    <lightning-button-icon 
+                        icon-name="utility:refresh" 
+                        alternative-text="Refresh" 
+                        title="Refresh"
+                        onclick={handleRefresh}
+                        class="control-button">
+                    </lightning-button-icon>
+                </div>
+            </div>
         </div>
-        
-        <div class="control-buttons">
-            <lightning-button-icon 
-                icon-name="utility:refresh" 
-                alternative-text="Refresh" 
-                title="Refresh"
-                onclick={handleRefresh}
-                class="control-button">
-            </lightning-button-icon>
-        </div>
-    </div>
-</div>
 
         <!-- Status Info Bar 
         <div class="status-info">
@@ -98,15 +95,8 @@
                                                     {cell.displayValue}
                                                 </template>
                                                 <template if:true={cell.isLink}>
-    <a href="javascript:void(0);"
-       class="cell-link"
-       data-id={record.Id}
-       data-field={cell.fieldName}
-       onclick={handleRowClick}>
-        {cell.displayValue}
-    </a>
-</template>
-
+                                                    <a href="#" class="cell-link">{cell.displayValue}</a>
+                                                </template>
                                             </template>
                                         </div>
                                     </td>
@@ -135,13 +125,7 @@
                                     <div class="mobile-card-title">{record.primaryField.displayValue}</div>
                                 </template>
                                 <template if:true={record.primaryField.isLink}>
-<a href="javascript:void(0);"
-   class="mobile-card-title"
-   data-id={record.Id}
-   data-field={record.primaryField.fieldName}
-   onclick={handleRowClick}>
-    {record.primaryField.displayValue}
-</a>
+                                    <a href="#" class="mobile-card-title">{record.primaryField.displayValue}</a>
                                 </template>
                             </template>
                             <template if:false={record.primaryField}>
@@ -158,13 +142,7 @@
                                             <span class="mobile-field-value">{field.displayValue}</span>
                                         </template>
                                         <template if:true={field.isLink}>
-<a href="javascript:void(0);"
-   class="mobile-field-value is-link"
-   data-id={record.Id}
-   data-field={field.fieldName}
-   onclick={handleRowClick}>
-    {field.displayValue}
-</a>
+                                            <a href="#" class="mobile-field-value is-link">{field.displayValue}</a>
                                         </template>
                                     </template>
                                     <template if:false={field.value}>
@@ -184,13 +162,7 @@
                                                     <span class="mobile-field-value">{field.displayValue}</span>
                                                 </template>
                                                 <template if:true={field.isLink}>
-<a href="javascript:void(0);"
-   class="mobile-field-value is-link"
-   data-id={record.Id}
-   data-field={field.fieldName}
-   onclick={handleRowClick}>
-    {field.displayValue}
-</a>
+                                                    <a href="#" class="mobile-field-value is-link">{field.displayValue}</a>
                                                 </template>
                                             </template>
                                             <template if:false={field.value}>

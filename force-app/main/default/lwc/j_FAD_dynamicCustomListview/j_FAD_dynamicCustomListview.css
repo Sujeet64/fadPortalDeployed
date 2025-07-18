@@ -251,6 +251,40 @@ input[type="search"]:focus {
     opacity: 1;
 }
 
+.search-input {
+    pointer-events: auto !important;
+    user-select: text !important;
+}
+
+.search-input input {
+    pointer-events: auto !important;
+    user-select: text !important;
+}
+
+.cell-text {
+    user-select: text;
+    cursor: text;
+}
+
+.cell-link {
+    user-select: text;
+    cursor: pointer;
+    color: #0176d3;
+    text-decoration: none;
+}
+
+.cell-link:hover {
+    text-decoration: underline;
+}
+
+.data-cell {
+    user-select: text;
+    cursor: default;
+}
+
+.data-row {
+    cursor: default;
+}
 /* Table Body */
 .slds-table tbody tr {
     border-bottom: 1px solid #c9c9c9;

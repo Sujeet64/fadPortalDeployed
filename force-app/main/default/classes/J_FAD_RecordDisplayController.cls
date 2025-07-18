@@ -2,7 +2,7 @@
  * @description       : Controller for handling record display and search functionality in a list view.
  * @author            : ChangeMeIn@UserSettingsUnder.SFDoc
  * @group             : 
- * @last modified on  : 07-16-2025
+ * @last modified on  : 07-17-2025
  * @last modified by  : ChangeMeIn@UserSettingsUnder.SFDoc
  */
 public with sharing class J_FAD_RecordDisplayController {
@@ -17,7 +17,7 @@ public with sharing class J_FAD_RecordDisplayController {
     private static Map<String, Database.QueryLocator> queryLocatorCache = new Map<String, Database.QueryLocator>();
     
     @AuraEnabled(cacheable=false)
-    public static RecordResponse getRecords(String configName, Integer pageSize, Integer offset, String searchTerm, String queryLocatorId) {
+    public static RecordResponse getRecords(String configName, Integer pageSize, Integer offset, String searchTerm, String sortBy, String queryLocatorId) {
         try {
             if (String.isBlank(configName)) {
                 throw new AuraHandledException('Configuration name is required.');
@@ -44,6 +44,7 @@ public with sharing class J_FAD_RecordDisplayController {
             String recordType = (String) configData.get('recordType');
             Boolean isActive = (Boolean) configData.get('isActive');
             List<Object> fieldsConfig = (List<Object>) configData.get('fields');
+            String configSortBy = (String) configData.get('sortBy');
             Integer configPageSize = configData.containsKey('pageSize') ? (Integer) configData.get('pageSize') : 20;
 
             pageSize = pageSize != null ? pageSize : configPageSize;
@@ -57,10 +58,11 @@ public with sharing class J_FAD_RecordDisplayController {
             if (objectApiName == 'Account' && !safeFields.contains('IsPersonAccount')) {
                 safeFields.add('IsPersonAccount');
             }
+
             List<Map<String, Object>> searchableFields = buildSearchableFields(objectApiName, fieldsConfig);
 
             List<String> whereConditions = new List<String>();
-            
+
             if (String.isNotBlank(recordType)) {
                 whereConditions.add('RecordType.DeveloperName = \'' + String.escapeSingleQuotes(recordType) + '\'');
             }
@@ -68,14 +70,16 @@ public with sharing class J_FAD_RecordDisplayController {
             if (String.isNotBlank(searchTerm) && !searchableFields.isEmpty()) {
                 List<String> personAccountSearchConditions = new List<String>();
                 List<String> businessAccountSearchConditions = new List<String>();
+
                 for (Map<String, Object> searchField : searchableFields) {
                     String fieldName = (String) searchField.get('fieldName');
                     Boolean isEncrypted = (Boolean) searchField.get('isEncrypted');
                     Boolean isPersonAccountField = (Boolean) searchField.get('isPersonAccountField');
+
                     String condition = isEncrypted ? 
                         (fieldName + ' = :searchTerm') : 
                         (fieldName + ' LIKE :likePattern');
-                    
+
                     if (isPersonAccountField) {
                         personAccountSearchConditions.add(condition);
                     } else {
@@ -84,12 +88,23 @@ public with sharing class J_FAD_RecordDisplayController {
                 }
 
                 List<String> searchConditions = new List<String>();
-                if (!personAccountSearchConditions.isEmpty()) {
-                    searchConditions.add('(IsPersonAccount = true AND (' + String.join(personAccountSearchConditions, ' OR ') + '))');
+
+                if (objectApiName == 'Account') {
+                    if (!personAccountSearchConditions.isEmpty()) {
+                        searchConditions.add('(IsPersonAccount = true AND (' + String.join(personAccountSearchConditions, ' OR ') + '))');
+                    }
+                    if (!businessAccountSearchConditions.isEmpty()) {
+                        searchConditions.add('(IsPersonAccount = false AND (' + String.join(businessAccountSearchConditions, ' OR ') + '))');
+                    }
+                } else {
+                    List<String> combined = new List<String>();
+                    combined.addAll(personAccountSearchConditions);
+                    combined.addAll(businessAccountSearchConditions);
+                    if (!combined.isEmpty()) {
+                        searchConditions.add('(' + String.join(combined, ' OR ') + ')');
+                    }
                 }
-                if (!businessAccountSearchConditions.isEmpty()) {
-                    searchConditions.add('(IsPersonAccount = false AND (' + String.join(businessAccountSearchConditions, ' OR ') + '))');
-                }
+
                 if (!searchConditions.isEmpty()) {
                     whereConditions.add('(' + String.join(searchConditions, ' OR ') + ')');
                 }
@@ -98,7 +113,9 @@ public with sharing class J_FAD_RecordDisplayController {
             String whereClause = whereConditions.isEmpty() ? '' : ' WHERE ' + String.join(whereConditions, ' AND ');
 
             String likePattern = '%' + (String.isNotBlank(searchTerm) ? searchTerm : '') + '%';
-            return getRecordsWithQueryLocator(objectApiName, safeFields, whereClause, pageSize, offset, queryLocatorId, likePattern, searchTerm);
+
+            return getRecordsWithQueryLocator(objectApiName, safeFields, whereClause, sortBy, configSortBy, 
+                                              pageSize, offset, queryLocatorId, likePattern, searchTerm);
 
         } catch (Exception e) {
             System.debug('Error in getRecords: ' + e.getMessage());
@@ -108,16 +125,25 @@ public with sharing class J_FAD_RecordDisplayController {
     }
 
     private static RecordResponse getRecordsWithQueryLocator(String objectApiName, List<String> safeFields, 
-                                                           String whereClause, Integer pageSize, Integer offset, 
-                                                           String queryLocatorId, String likePattern, String searchTerm) {
-        
+                                                           String whereClause, String sortBy, String configSortBy,
+                                                           Integer pageSize, Integer offset, String queryLocatorId, 
+                                                           String likePattern, String searchTerm) {
+
         String query = 'SELECT ' + String.join(safeFields, ', ') + ' FROM ' + objectApiName + whereClause;
-        
+
+        String finalSortBy = String.isNotBlank(sortBy) ? sortBy : (String.isNotBlank(configSortBy) ? configSortBy : 'Name ASC');
+        if (String.isNotBlank(finalSortBy)) {
+            String sortField = finalSortBy.split(' ')[0];
+            if (safeFields.contains(sortField) || sortField.contains('.')) {
+                // query += ' ORDER BY ' + finalSortBy;
+            }
+        }
+
         System.debug('QueryLocator Query: ' + query);
-        
+
         Database.QueryLocator queryLocator;
         String currentLocatorId = queryLocatorId;
-        
+
         if (String.isNotBlank(queryLocatorId) && queryLocatorCache.containsKey(queryLocatorId)) {
             queryLocator = queryLocatorCache.get(queryLocatorId);
         } else {
@@ -131,22 +157,22 @@ public with sharing class J_FAD_RecordDisplayController {
         }
 
         Database.QueryLocatorIterator iterator = queryLocator.iterator();
-        
+
         Integer skipCount = 0;
         while (iterator.hasNext() && skipCount < offset) {
             iterator.next();
             skipCount++;
         }
-        
+
         List<SObject> records = new List<SObject>();
         Integer recordCount = 0;
         while (iterator.hasNext() && recordCount < pageSize) {
             records.add(iterator.next());
             recordCount++;
         }
-        
+
         Integer totalCount = getTotalRecordCount(objectApiName, whereClause);
-        
+
         RecordResponse response = new RecordResponse();
         response.records = records;
         response.totalCount = totalCount;
@@ -162,7 +188,7 @@ public with sharing class J_FAD_RecordDisplayController {
             return Database.countQuery(countQuery);
         } catch (Exception e) {
             System.debug('Count query failed: ' + e.getMessage());
-            return 50000;
+            return 50000; // Return max estimate
         }
     }
 
@@ -173,9 +199,9 @@ public with sharing class J_FAD_RecordDisplayController {
     private static List<String> buildSafeFields(String objectApiName, List<Object> fieldsConfig) {
         Schema.SObjectType sObjectType = Schema.getGlobalDescribe().get(objectApiName);
         Map<String, Schema.SObjectField> fieldMap = sObjectType.getDescribe().fields.getMap();
-        
+
         Set<String> uniqueFields = new Set<String>();
-        
+
         for (Object fieldConfig : fieldsConfig) {
             String fieldName = '';
             if (fieldConfig instanceof Map<String, Object>) {
@@ -216,7 +242,6 @@ public with sharing class J_FAD_RecordDisplayController {
         }
 
         uniqueFields.add('Id');
-        
         return new List<String>(uniqueFields);
     }
 
@@ -267,7 +292,7 @@ public with sharing class J_FAD_RecordDisplayController {
                                     List<Map<String, Object>> searchableFields, Set<String> personAccountFields) {
         if (String.isNotBlank(fieldName)) {
             Boolean isPersonAccountField = objectApiName == 'Account' && personAccountFields.contains(fieldName);
-            
+
             if (fieldName.contains('.')) {
                 if (fieldName.contains('Name') || fieldName.contains('DeveloperName')) {
                     searchableFields.add(new Map<String, Object>{
