@@ -16,8 +16,8 @@ public with sharing class J_FAD_RecordDisplayController {
 
     private static Map<String, Database.QueryLocator> queryLocatorCache = new Map<String, Database.QueryLocator>();
     
-    @AuraEnabled(cacheable=false)
-    public static RecordResponse getRecords(String configName, Integer pageSize, Integer offset, String searchTerm, String sortBy, String queryLocatorId) {
+   @AuraEnabled(cacheable=false)
+public static RecordResponse getRecords(String configName, Integer pageSize, Integer offset, String searchTerm, String sortBy, String queryLocatorId, String recordId)  {
         try {
             if (String.isBlank(configName)) {
                 throw new AuraHandledException('Configuration name is required.');
@@ -45,6 +45,8 @@ public with sharing class J_FAD_RecordDisplayController {
             Boolean isActive = (Boolean) configData.get('isActive');
             List<Object> fieldsConfig = (List<Object>) configData.get('fields');
             String configSortBy = (String) configData.get('sortBy');
+            String relationshipField = (String) configData.get('relationshipField');
+
             Integer configPageSize = configData.containsKey('pageSize') ? (Integer) configData.get('pageSize') : 20;
 
             pageSize = pageSize != null ? pageSize : configPageSize;
@@ -66,6 +68,15 @@ public with sharing class J_FAD_RecordDisplayController {
             if (String.isNotBlank(recordType)) {
                 whereConditions.add('RecordType.DeveloperName = \'' + String.escapeSingleQuotes(recordType) + '\'');
             }
+
+            // ✅ Add this to support filtering by parent record ID (e.g., AccountId = 001...)
+if (String.isNotBlank(recordId) && String.isNotBlank(relationshipField)) {
+    String resolvedId = resolveRelationshipId(recordId, relationshipField);
+    if (resolvedId != null) {
+        whereConditions.add(relationshipField + ' = \'' + String.escapeSingleQuotes(resolvedId) + '\'');
+    }
+}
+
 
             if (String.isNotBlank(searchTerm) && !searchableFields.isEmpty()) {
                 List<String> personAccountSearchConditions = new List<String>();
@@ -123,6 +134,35 @@ public with sharing class J_FAD_RecordDisplayController {
             throw new AuraHandledException('Error fetching records: ' + e.getMessage());
         }
     }
+
+    private static String resolveRelationshipId(String recordId, String relationshipField) {
+    try {
+        Id inputId = recordId;
+        String objectPrefix = String.valueOf(inputId).substring(0, 3);
+
+        if (relationshipField == 'AccountId') {
+            if (objectPrefix == Schema.SObjectType.Contact.getKeyPrefix()) {
+                Contact c = [SELECT AccountId FROM Contact WHERE Id = :inputId LIMIT 1];
+                return c.AccountId;
+            }
+            if (objectPrefix == Schema.SObjectType.Opportunity.getKeyPrefix()) {
+                Opportunity o = [SELECT AccountId FROM Opportunity WHERE Id = :inputId LIMIT 1];
+                return o.AccountId;
+            }
+            if (objectPrefix == Schema.SObjectType.Account.getKeyPrefix()) {
+                return inputId; // Direct Account ID
+            }
+        }
+
+        // Fallback
+        return inputId;
+    } catch (Exception ex) {
+        System.debug('resolveRelationshipId failed: ' + ex.getMessage());
+        return null;
+    }
+}
+
+
 
    private static RecordResponse getRecordsWithQueryLocator(String objectApiName, List<String> safeFields, 
                                                        String whereClause, String sortBy, String configSortBy,

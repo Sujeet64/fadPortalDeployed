@@ -22,7 +22,8 @@ export default class RecordListView extends NavigationMixin(LightningElement) {
     @track lastUpdateTime;
     @track queryLocatorId;
     @track currentPageReference;
-
+    recordIdFromUrl;
+    relatedObjectApiName;
     pageSize = 20;
     currentOffset = 0;
     hasMoreRecords = true;
@@ -52,24 +53,29 @@ export default class RecordListView extends NavigationMixin(LightningElement) {
     }
 
     extractConfigNameFromUrl() {
-        try {
-            const url = window.location.href;
-            console.log('Current URL:', url);
-            const urlParts = url.split('/');
-            const pageName = urlParts[urlParts.length - 1];
-            const cleanPageName = pageName.split('?')[0];
-            console.log('Extracted page name:', cleanPageName);
-            if (cleanPageName && cleanPageName !== 's') {
-                this.configName = cleanPageName;
-            } else {
-                this.configName = 'Pharmacy';
-            }
-            console.log('Config name set to:', this.configName);
-        } catch (error) {
-            console.error('Error extracting config name from URL:', error);
+    try {
+        const url = window.location.href;
+        const urlParts = url.split('/');
+        console.log('Current URL:', url);
+
+        // Example: /s/relatedlistview/001O4000014PKGsIAO/Contact
+        if (urlParts.length >= 5) {
+            this.recordIdFromUrl = urlParts[urlParts.length - 2]; // "001O4000014PKGsIAO"
+            this.configName = urlParts[urlParts.length - 1];      // "Contact"
+        } else {
             this.configName = 'Pharmacy';
+            this.recordIdFromUrl = null;
         }
+
+        console.log('Extracted recordId:', this.recordIdFromUrl);
+        console.log('Config name set to:', this.configName);
+    } catch (error) {
+        console.error('Error extracting config name and recordId from URL:', error);
+        this.configName = 'Pharmacy';
+        this.recordIdFromUrl = null;
     }
+}
+
 
     renderedCallback() {
         this.attachScrollListeners();
@@ -171,7 +177,8 @@ parseSortByFromConfig() {
                 offset: this.currentOffset,
                 searchTerm: this.searchTerm,
                 sortBy: sortBy,
-                queryLocatorId: this.queryLocatorId
+                queryLocatorId: this.queryLocatorId,
+                recordId: this.recordIdFromUrl 
             });
 
             this.queryLocatorId = result.queryLocatorId;
