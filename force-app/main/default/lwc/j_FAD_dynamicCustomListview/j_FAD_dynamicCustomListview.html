@@ -2,11 +2,11 @@
   @description       : 
   @author            : ChangeMeIn@UserSettingsUnder.SFDoc
   @group             : 
-  @last modified on  : 07-18-2025
+  @last modified on  : 07-19-2025
   @last modified by  : ChangeMeIn@UserSettingsUnder.SFDoc
 -->
 <template>
-    <div class="list-view-container">
+     <div class="list-view-container">
         <!-- Header Section -->
         <div class="list-header">
             <div class="list-title-section">
@@ -40,6 +40,13 @@
             </div>
         </div>
 
+        <!-- Status Info Bar 
+        <div class="status-info">
+            <span class="status-text">
+                {itemsDisplayText} • {sortInfoText} • {filterInfoText} • {updateInfoText}
+            </span>
+        </div> -->
+
         <!-- Initial Loading Spinner -->
         <template if:true={isLoading}>
             <div class="loading-container">
@@ -60,48 +67,57 @@
             <div class="table-container" onscroll={handleScroll} data-loading-type="infiniteScroll">
                 <table class="slds-table slds-table_cell-buffer slds-table_bordered slds-table_fixed-layout">
                     <thead>
-                        <tr class="slds-line-height_reset">
-                            <template for:each={columns} for:item="column">
-                                <th key={column.fieldName} class="slds-text-title_caps sortable-header" scope="col">
-                                    <template if:true={column.sortable}>
-                                        <div class="header-content" data-field={column.fieldName} onclick={handleSort}>
-                                            <span class="slds-truncate">{column.label}</span>
-                                            <lightning-icon 
-                                                icon-name={column.sortIcon} 
-                                                size="xx-small" 
-                                                class="sort-icon">
-                                            </lightning-icon>
-                                        </div>
-                                    </template>
-                                    <template if:false={column.sortable}>
-                                        <div class="header-content" data-field={column.fieldName}>
-                                            <span class="slds-truncate">{column.label}</span>
-                                        </div>
-                                    </template>
-                                </th>
-                            </template>
-                        </tr>
-                    </thead>
+    <tr class="slds-line-height_reset">
+        <template for:each={columns} for:item="column">
+            <th key={column.fieldName} class="slds-text-title_caps" scope="col">
+                <!-- Only make header clickable if sortable -->
+                <template if:true={column.sortable}>
+                    <div class="header-content sortable-header" data-field={column.fieldName} onclick={handleSort}>
+                        <span class="slds-truncate">{column.label}</span>
+                        <lightning-icon 
+                            icon-name={column.sortIcon} 
+                            size="xx-small" 
+                            class="sort-icon">
+                        </lightning-icon>
+                    </div>
+                </template>
+                
+                <!-- Non-sortable header -->
+                <template if:false={column.sortable}>
+                    <div class="header-content non-sortable-header">
+                        <span class="slds-truncate">{column.label}</span>
+                    </div>
+                </template>
+            </th>
+        </template>
+    </tr>
+</thead>
                     <tbody>
-                        <template for:each={filteredRecords} for:item="record">
-                            <tr key={record.key} class="data-row" data-id={record.Id} onclick={handleRowClick}>
-                                <template for:each={record.cells} for:item="cell">
-                                    <td key={cell.fieldName} class="data-cell" data-field={cell.fieldName} data-id={record.Id}>
-                                        <div class="slds-truncate cell-content">
-                                            <template if:true={cell.value}>
-                                                <template if:false={cell.isLink}>
-                                                    {cell.displayValue}
-                                                </template>
-                                                <template if:true={cell.isLink}>
-                                                    <a href="#" class="cell-link">{cell.displayValue}</a>
-                                                </template>
-                                            </template>
-                                        </div>
-                                    </td>
-                                </template>
-                            </tr>
+    <template for:each={filteredRecords} for:item="record">
+        <tr key={record.key} class="data-row">
+            <template for:each={record.cells} for:item="cell">
+                <td key={cell.fieldName} class="data-cell">
+                    <div class="slds-truncate cell-content">
+                        <template if:true={cell.value}>
+                            <template if:false={cell.isLink}>
+                                {cell.displayValue}
+                            </template>
+                            <template if:true={cell.isLink}>
+                                <a href="#" 
+                                   class="cell-link" 
+                                   data-id={record.Id} 
+                                   data-field={cell.fieldName} 
+                                   onclick={handleRowClick}>
+                                   {cell.displayValue}
+                                </a>
+                            </template>
                         </template>
-                    </tbody>
+                    </div>
+                </td>
+            </template>
+        </tr>
+    </template>
+</tbody>
                 </table>
                 
                 <!-- Desktop Infinite Scroll Loading Indicator -->

@@ -1,15 +1,8 @@
 /**
- * @description       : 
+ * @description       : Controller for handling record display and search functionality in a list view.
  * @author            : ChangeMeIn@UserSettingsUnder.SFDoc
  * @group             : 
- * @last modified on  : 07-18-2025
- * @last modified by  : ChangeMeIn@UserSettingsUnder.SFDoc
-**/
-/**
- * @description       : Controller for handling record display and search functionality in a list view with server-side sorting.
- * @author            : ChangeMeIn@UserSettingsUnder.SFDoc
- * @group             : 
- * @last modified on  : 07-18-2025
+ * @last modified on  : 07-19-2025
  * @last modified by  : ChangeMeIn@UserSettingsUnder.SFDoc
  */
 public with sharing class J_FAD_RecordDisplayController {
@@ -24,7 +17,7 @@ public with sharing class J_FAD_RecordDisplayController {
     private static Map<String, Database.QueryLocator> queryLocatorCache = new Map<String, Database.QueryLocator>();
     
     @AuraEnabled(cacheable=false)
-    public static RecordResponse getRecords(String configName, Integer pageSize, Integer offset, String searchTerm, List<Map<String, String>> sortFields, String queryLocatorId, String parentRecordId, String relatedObjectApiName) {
+    public static RecordResponse getRecords(String configName, Integer pageSize, Integer offset, String searchTerm, String sortBy, String queryLocatorId) {
         try {
             if (String.isBlank(configName)) {
                 throw new AuraHandledException('Configuration name is required.');
@@ -70,15 +63,6 @@ public with sharing class J_FAD_RecordDisplayController {
 
             List<String> whereConditions = new List<String>();
 
-            if (String.isNotBlank(parentRecordId) && String.isNotBlank(relatedObjectApiName)) {
-                String relationshipField = getRelationshipField(objectApiName, relatedObjectApiName);
-                if (String.isNotBlank(relationshipField)) {
-                    whereConditions.add(relationshipField + ' = \'' + String.escapeSingleQuotes(parentRecordId) + '\'');
-                } else {
-                    throw new AuraHandledException('No relationship field found between ' + objectApiName + ' and ' + relatedObjectApiName);
-                }
-            }
-
             if (String.isNotBlank(recordType)) {
                 whereConditions.add('RecordType.DeveloperName = \'' + String.escapeSingleQuotes(recordType) + '\'');
             }
@@ -89,9 +73,12 @@ public with sharing class J_FAD_RecordDisplayController {
 
                 for (Map<String, Object> searchField : searchableFields) {
                     String fieldName = (String) searchField.get('fieldName');
+                    Boolean isEncrypted = (Boolean) searchField.get('isEncrypted');
                     Boolean isPersonAccountField = (Boolean) searchField.get('isPersonAccountField');
 
-                    String condition = fieldName + ' LIKE :likePattern';
+                    String condition = isEncrypted ? 
+                        (fieldName + ' = :searchTerm') : 
+                        (fieldName + ' LIKE :likePattern');
 
                     if (isPersonAccountField) {
                         personAccountSearchConditions.add(condition);
@@ -124,10 +111,11 @@ public with sharing class J_FAD_RecordDisplayController {
             }
 
             String whereClause = whereConditions.isEmpty() ? '' : ' WHERE ' + String.join(whereConditions, ' AND ');
+
             String likePattern = '%' + (String.isNotBlank(searchTerm) ? searchTerm : '') + '%';
 
-            return getRecordsWithQueryLocator(objectApiName, safeFields, whereClause, sortFields, configSortBy, 
-                                             pageSize, offset, queryLocatorId, likePattern, searchTerm, fieldsConfig);
+            return getRecordsWithQueryLocator(objectApiName, safeFields, whereClause, sortBy, configSortBy, 
+                                              pageSize, offset, queryLocatorId, likePattern, searchTerm);
 
         } catch (Exception e) {
             System.debug('Error in getRecords: ' + e.getMessage());
@@ -136,175 +124,197 @@ public with sharing class J_FAD_RecordDisplayController {
         }
     }
 
-    private static String getRelationshipField(String childObjectApiName, String parentObjectApiName) {
-        try {
-            System.debug('Finding relationship field for child: ' + childObjectApiName + ', parent: ' + parentObjectApiName);
-            Schema.SObjectType childSObjectType = Schema.getGlobalDescribe().get(childObjectApiName);
-            Map<String, Schema.SObjectField> fieldMap = childSObjectType.getDescribe().fields.getMap();
+   private static RecordResponse getRecordsWithQueryLocator(String objectApiName, List<String> safeFields, 
+                                                       String whereClause, String sortBy, String configSortBy,
+                                                       Integer pageSize, Integer offset, String queryLocatorId, 
+                                                       String likePattern, String searchTerm) {
+
+    String query = 'SELECT ' + String.join(safeFields, ', ') + ' FROM ' + objectApiName + whereClause;
+
+    // Fix: Build proper ORDER BY clause
+    String finalSortBy = String.isNotBlank(sortBy) ? sortBy : (String.isNotBlank(configSortBy) ? configSortBy : 'Name ASC');
+    if (String.isNotBlank(finalSortBy)) {
+        String orderByClause = buildOrderByClause(finalSortBy, safeFields, objectApiName);
+        if (String.isNotBlank(orderByClause)) {
+            query += ' ORDER BY ' + orderByClause;
+        }
+    }
+
+    System.debug('QueryLocator Query with ORDER BY: ' + query);
+
+    Database.QueryLocator queryLocator;
+    String currentLocatorId = queryLocatorId;
+
+    if (String.isNotBlank(queryLocatorId) && queryLocatorCache.containsKey(queryLocatorId)) {
+        queryLocator = queryLocatorCache.get(queryLocatorId);
+    } else {
+        queryLocator = Database.getQueryLocatorWithBinds(
+            query, 
+            new Map<String, Object>{ 'likePattern' => likePattern, 'searchTerm' => searchTerm }, 
+            AccessLevel.USER_MODE
+        );
+        currentLocatorId = generateQueryLocatorId();
+        queryLocatorCache.put(currentLocatorId, queryLocator);
+    }
+
+    Database.QueryLocatorIterator iterator = queryLocator.iterator();
+
+    Integer skipCount = 0;
+    while (iterator.hasNext() && skipCount < offset) {
+        iterator.next();
+        skipCount++;
+    }
+
+    List<SObject> records = new List<SObject>();
+    Integer recordCount = 0;
+    while (iterator.hasNext() && recordCount < pageSize) {
+        records.add(iterator.next());
+        recordCount++;
+    }
+
+    Integer totalCount = getTotalRecordCount(objectApiName, whereClause);
+
+    RecordResponse response = new RecordResponse();
+    response.records = records;
+    response.totalCount = totalCount;
+    response.hasMore = (offset + pageSize) < totalCount && iterator.hasNext();
+    response.queryLocatorId = currentLocatorId;
+
+    return response;
+}
+
+// Add this new method to build ORDER BY clause
+private static String buildOrderByClause(String sortBy, List<String> safeFields, String objectApiName) {
+    if (String.isBlank(sortBy)) {
+        return '';
+    }
+    
+    // Get field metadata for validation
+    Schema.SObjectType sObjectType = Schema.getGlobalDescribe().get(objectApiName);
+    Map<String, Schema.SObjectField> fieldMap = sObjectType.getDescribe().fields.getMap();
+    
+    List<String> validOrderByParts = new List<String>();
+    
+    // Split by comma to handle multiple sort fields like "Name ASC, Site ASC"
+    String[] sortParts = sortBy.split(',');
+    
+    for (String sortPart : sortParts) {
+        sortPart = sortPart.trim();
+        
+        // Extract field name and direction
+        String[] fieldAndDirection = sortPart.split(' ');
+        String fieldName = fieldAndDirection[0].trim();
+        String direction = fieldAndDirection.size() > 1 ? fieldAndDirection[1].trim().toUpperCase() : 'ASC';
+        
+        // Validate direction
+        if (direction != 'ASC' && direction != 'DESC') {
+            direction = 'ASC';
+        }
+        
+        // Validate field - check if it's in safeFields or is a relationship field
+        Boolean isValidField = false;
+        
+        if (fieldName.contains('.')) {
+            // Handle relationship fields like RecordType.DeveloperName
+            String[] relationshipParts = fieldName.split('\\.');
+            String relationshipField = relationshipParts[0];
             
-            for (String fieldName : fieldMap.keySet()) {
-                Schema.SObjectField field = fieldMap.get(fieldName);
-                Schema.DescribeFieldResult fieldDescribe = field.getDescribe();
-                
-                if (fieldDescribe.getType() == Schema.DisplayType.REFERENCE) {
-                    List<Schema.SObjectType> referenceTo = fieldDescribe.getReferenceTo();
-                    if (!referenceTo.isEmpty() && referenceTo[0].getDescribe().getName() == parentObjectApiName) {
-                        System.debug('Found relationship field: ' + fieldName);
-                        return fieldName;
-                    }
-                }
-            }
-            System.debug('No relationship field found between ' + childObjectApiName + ' and ' + parentObjectApiName);
-            return null;
-        } catch (Exception e) {
-            System.debug('Error finding relationship field: ' + e.getMessage());
-            return null;
-        }
-    }
-
-    private static RecordResponse getRecordsWithQueryLocator(String objectApiName, List<String> safeFields, 
-                                                            String whereClause, List<Map<String, String>> sortFields, 
-                                                            String configSortBy, Integer pageSize, Integer offset, 
-                                                            String queryLocatorId, String likePattern, String searchTerm, 
-                                                            List<Object> fieldsConfig) {
-
-        String query = 'SELECT ' + String.join(safeFields, ', ') + ' FROM ' + objectApiName + whereClause;
-
-        // Validate and apply sorting
-        String finalSortBy = validateSortBy(sortFields, configSortBy, fieldsConfig, safeFields);
-        if (String.isNotBlank(finalSortBy)) {
-            query += ' ORDER BY ' + finalSortBy;
-        }
-
-        query += ' LIMIT ' + (pageSize + 1);
-        query += ' OFFSET ' + offset;
-
-        System.debug('Final Query: ' + query);
-
-        try {
-            List<SObject> allRecords = Database.queryWithBinds(
-                query, 
-                new Map<String, Object>{ 'likePattern' => likePattern, 'searchTerm' => searchTerm }, 
-                AccessLevel.USER_MODE
-            );
-            Boolean hasMore = allRecords.size() > pageSize;
-            List<SObject> records;
-
-            if (hasMore) {
-                records = new List<SObject>();
-                for (Integer i = 0; i < pageSize; i++) {
-                    records.add(allRecords[i]);
-                }
-            } else {
-                records = allRecords;
-            }
-
-            Integer totalCount = getTotalRecordCount(objectApiName, whereClause, likePattern, searchTerm);
-
-            RecordResponse response = new RecordResponse();
-            response.records = records;
-            response.totalCount = totalCount;
-            response.hasMore = hasMore;
-            response.queryLocatorId = null;
-
-            return response;
-        } catch (Exception e) {
-            System.debug('Query execution failed: ' + e.getMessage());
-            throw new AuraHandledException('Error executing query: ' + e.getMessage());
-        }
-    }
-
-    private static String validateSortBy(List<Map<String, String>> sortFields, String configSortBy, List<Object> fieldsConfig, List<String> safeFields) {
-        String defaultSortBy = String.isNotBlank(configSortBy) ? configSortBy : 'Name ASC';
-        List<String> validatedSortFields = new List<String>();
-
-        // Build a map of sortable fields from config
-        Map<String, Boolean> sortableFieldsMap = new Map<String, Boolean>();
-        for (Object fieldConfig : fieldsConfig) {
-            if (fieldConfig instanceof Map<String, Object>) {
-                Map<String, Object> fieldMap = (Map<String, Object>) fieldConfig;
-                String fieldName = (String) fieldMap.get('fieldName');
-                Boolean sortable = fieldMap.containsKey('sortable') ? (Boolean) fieldMap.get('sortable') : true;
-                if (String.isNotBlank(fieldName)) {
-                    sortableFieldsMap.put(fieldName.toLowerCase(), sortable);
-                }
-            }
-        }
-
-        // Validate client-provided sort fields
-        if (sortFields != null && !sortFields.isEmpty()) {
-            for (Map<String, String> sortField : sortFields) {
-                String fieldName = sortField.get('fieldName');
-                String direction = sortField.get('direction')?.toUpperCase();
-
-                if (String.isBlank(fieldName) || String.isBlank(direction)) {
-                    System.debug('Skipping invalid sort field: ' + fieldName + ', direction: ' + direction);
-                    continue;
-                }
-
-                if (direction != 'ASC' && direction != 'DESC') {
-                    direction = 'ASC';
-                    System.debug('Invalid direction for field ' + fieldName + ', defaulting to ASC');
-                }
-
-                // Check if field is sortable and exists in safeFields
-                Boolean isSortable = sortableFieldsMap.containsKey(fieldName.toLowerCase()) ? sortableFieldsMap.get(fieldName.toLowerCase()) : false;
-                Boolean isValidField = safeFields.contains(fieldName) || fieldName.contains('.');
-
-                if (isSortable && isValidField) {
-                    validatedSortFields.add(fieldName + ' ' + direction);
-                    System.debug('Validated sort field: ' + fieldName + ' ' + direction);
-                } else {
-                    System.debug('Rejected sort field: ' + fieldName + ' (not sortable or not in safeFields)');
-                }
+            // Allow common relationship fields
+            Set<String> allowedRelationships = new Set<String>{
+                'RecordType', 'Owner', 'CreatedBy', 'LastModifiedBy'
+            };
+            
+            if (allowedRelationships.contains(relationshipField) && relationshipParts.size() == 2) {
+                isValidField = true;
             }
         } else {
-            // Use default sortBy from config if no sortFields provided
-            validatedSortFields.add(defaultSortBy);
-            System.debug('No sort fields provided, using default: ' + defaultSortBy);
+            // Check if field exists in object and is sortable
+            if (fieldMap.containsKey(fieldName) && safeFields.contains(fieldName)) {
+                Schema.DescribeFieldResult fieldDescribe = fieldMap.get(fieldName).getDescribe();
+                isValidField = fieldDescribe.isSortable();
+            }
         }
-
-        String finalSortBy = String.join(validatedSortFields, ', ');
-        System.debug('Final sortBy: ' + finalSortBy);
-        return finalSortBy;
+        
+        if (isValidField) {
+            validOrderByParts.add(fieldName + ' ' + direction);
+        } else {
+            System.debug('Skipping invalid or non-sortable field: ' + fieldName);
+        }
     }
+    
+    return String.join(validOrderByParts, ', ');
+}
 
-    private static Integer getTotalRecordCount(String objectApiName, String whereClause, String likePattern, String searchTerm) {
+
+    private static Integer getTotalRecordCount(String objectApiName, String whereClause) {
         try {
             String countQuery = 'SELECT COUNT() FROM ' + objectApiName + whereClause;
-            return Database.countQueryWithBinds(countQuery, 
-                new Map<String, Object>{ 'likePattern' => likePattern, 'searchTerm' => searchTerm }, 
-                AccessLevel.USER_MODE);
+            return Database.countQuery(countQuery);
         } catch (Exception e) {
             System.debug('Count query failed: ' + e.getMessage());
-            return 0;
+            return 50000; // Return max estimate
         }
     }
 
-    private static List<String> buildSafeFields(String objectApiName, List<Object> fieldsConfig) {
-        Set<String> uniqueFields = new Set<String>();
+    private static String generateQueryLocatorId() {
+        return 'QL_' + System.currentTimeMillis() + '_' + Math.round(Math.random() * 1000);
+    }
 
-        for (Object fieldConfig : fieldsConfig) {
-            String fieldName = '';
+   private static List<String> buildSafeFields(String objectApiName, List<Object> fieldsConfig) {
+    Schema.SObjectType sObjectType = Schema.getGlobalDescribe().get(objectApiName);
+    Map<String, Schema.SObjectField> fieldMap = sObjectType.getDescribe().fields.getMap();
 
-            if (fieldConfig instanceof Map<String, Object>) {
-                Map<String, Object> configMap = (Map<String, Object>) fieldConfig;
-                if (configMap.containsKey('fieldName')) {
-                    fieldName = (String) configMap.get('fieldName');
+    Set<String> uniqueFields = new Set<String>();
+
+    for (Object fieldConfig : fieldsConfig) {
+        String fieldName = '';
+        if (fieldConfig instanceof Map<String, Object>) {
+            Map<String, Object> fieldMap2 = (Map<String, Object>) fieldConfig;
+            if (fieldMap2.containsKey('fields')) {
+                List<Object> nestedFields = (List<Object>) fieldMap2.get('fields');
+                for (Object nestedField : nestedFields) {
+                    if (nestedField instanceof Map<String, Object>) {
+                        fieldName = (String) ((Map<String, Object>) nestedField).get('fieldName');
+                        if (String.isNotBlank(fieldName)) {
+                            addFieldToSafeList(fieldName, fieldMap, uniqueFields);
+                        }
+                    }
                 }
-            } else if (fieldConfig instanceof String) {
-                fieldName = (String) fieldConfig;
+            } else {
+                fieldName = (String) fieldMap2.get('fieldName');
             }
+        } else if (fieldConfig instanceof String) {
+            fieldName = (String) fieldConfig;
+        }
 
-            if (String.isNotBlank(fieldName)) {
+        if (String.isNotBlank(fieldName)) {
+            addFieldToSafeList(fieldName, fieldMap, uniqueFields);
+        }
+    }
+
+    uniqueFields.add('Id');
+    return new List<String>(uniqueFields);
+}
+
+// Add helper method for field validation
+private static void addFieldToSafeList(String fieldName, Map<String, Schema.SObjectField> fieldMap, Set<String> uniqueFields) {
+    if (fieldName.contains('.')) {
+        // Handle relationship fields
+        String[] parts = fieldName.split('\\.');
+        if (parts.size() == 2) {
+            String relationshipField = parts[0];
+            // Allow common relationship fields
+            Set<String> allowedRelationships = new Set<String>{
+                'RecordType', 'Owner', 'CreatedBy', 'LastModifiedBy'
+            };
+            if (allowedRelationships.contains(relationshipField)) {
                 uniqueFields.add(fieldName);
             }
         }
-
-        uniqueFields.add('Id');
-        System.debug('Built safeFields: ' + uniqueFields);
-        return new List<String>(uniqueFields);
+    } else if (fieldMap.containsKey(fieldName)) {
+        uniqueFields.add(fieldName);
     }
+}
 
     private static List<Map<String, Object>> buildSearchableFields(String objectApiName, List<Object> fieldsConfig) {
         Schema.SObjectType sObjectType = Schema.getGlobalDescribe().get(objectApiName);
@@ -358,6 +368,7 @@ public with sharing class J_FAD_RecordDisplayController {
                 if (fieldName.contains('Name') || fieldName.contains('DeveloperName')) {
                     searchableFields.add(new Map<String, Object>{
                         'fieldName' => fieldName,
+                        'isEncrypted' => false,
                         'isPersonAccountField' => false
                     });
                 }
@@ -377,6 +388,7 @@ public with sharing class J_FAD_RecordDisplayController {
                 if (isTextType && describe.isFilterable()) {
                     searchableFields.add(new Map<String, Object>{
                         'fieldName' => fieldName,
+                        'isEncrypted' => describe.isEncrypted(),
                         'isPersonAccountField' => isPersonAccountField
                     });
                 }

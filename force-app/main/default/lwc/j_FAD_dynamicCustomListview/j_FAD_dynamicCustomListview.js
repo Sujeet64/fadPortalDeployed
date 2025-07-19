@@ -1,35 +1,40 @@
 import { LightningElement, track, wire } from 'lwc';
 import { ShowToastEvent } from 'lightning/platformShowToastEvent';
 import { NavigationMixin } from 'lightning/navigation';
+import { CurrentPageReference } from 'lightning/navigation';
 import getRecords from '@salesforce/apex/J_FAD_RecordDisplayController.getRecords';
 import getConfig from '@salesforce/apex/J_FAD_RecordDisplayController.getConfig';
 import cleanupQueryLocatorCache from '@salesforce/apex/J_FAD_RecordDisplayController.cleanupQueryLocatorCache';
 
 export default class RecordListView extends NavigationMixin(LightningElement) {
     @track records = [];
-    @track parentRecordId = '';
-    @track relatedObjectApiName = '';
-    @track isRelatedListView = false;
+    
     @track columns = [];
     @track error;
     @track isLoading = false;
     @track isLoadingMore = false;
     @track searchTerm = '';
-    @track sortFields = []; // Array of { fieldName, direction }
+    @track sortField = '';
+    @track sortDirection = 'asc';
     @track config = {};
     @track listTitle = 'Records';
     @track displayedRecords = [];
     @track lastUpdateTime;
     @track queryLocatorId;
+    @track currentPageReference;
 
     pageSize = 20;
     currentOffset = 0;
     hasMoreRecords = true;
     loadingType = 'infiniteScroll';
     expandedCardIds = new Set();
-    configName = 'HCO'; // Updated to match your MDT Label
+    configName = 'Pharmacy'; // Default fallback
     scrollThreshold = 100;
     isScrollLoading = false;
+
+    // Store scroll position
+    scrollPosition = 0;
+    containerHeight = 0;
 
     connectedCallback() {
         this.getCurrentPageReference();
@@ -38,7 +43,9 @@ export default class RecordListView extends NavigationMixin(LightningElement) {
     getCurrentPageReference() {
         const pageRef = this[NavigationMixin.GenerateUrl]({
             type: 'standard__webPage',
-            attributes: { url: window.location.href }
+            attributes: {
+                url: window.location.href
+            }
         });
         this.extractConfigNameFromUrl();
         this.loadConfig();
@@ -49,36 +56,18 @@ export default class RecordListView extends NavigationMixin(LightningElement) {
             const url = window.location.href;
             console.log('Current URL:', url);
             const urlParts = url.split('/');
-            const isRelatedList = urlParts.some(part => part === 'relatedlist');
-
-            if (isRelatedList) {
-                const recordIdIndex = urlParts.indexOf('relatedlist') + 1;
-                const relatedObjectIndex = recordIdIndex + 1;
-
-                this.parentRecordId = urlParts[recordIdIndex] || '';
-                this.relatedObjectApiName = urlParts[relatedObjectIndex]?.split('?')[0] || '';
-                this.isRelatedListView = String.isNotBlank(this.parentRecordId) && String.isNotBlank(this.relatedObjectApiName);
-
-                if (this.isRelatedListView) {
-                    this.configName = this.relatedObjectApiName;
-                    console.log('Related List View - Parent Record ID:', this.parentRecordId);
-                    console.log('Related List View - Related Object:', this.relatedObjectApiName);
-                    console.log('Config name set to:', this.configName);
-                } else {
-                    this.configName = 'HCO'; // Updated to match your MDT Label
-                    this.isRelatedListView = false;
-                    console.log('Missing recordId or relatedObjectApiName, using default config:', this.configName);
-                }
+            const pageName = urlParts[urlParts.length - 1];
+            const cleanPageName = pageName.split('?')[0];
+            console.log('Extracted page name:', cleanPageName);
+            if (cleanPageName && cleanPageName !== 's') {
+                this.configName = cleanPageName;
             } else {
-                const pageName = urlParts[urlParts.length - 1].split('?')[0];
-                this.configName = pageName && pageName !== 's' ? pageName : 'HCO'; // Updated to match your MDT Label
-                this.isRelatedListView = false;
-                console.log('Default List View - Config name set to:', this.configName);
+                this.configName = 'Pharmacy';
             }
+            console.log('Config name set to:', this.configName);
         } catch (error) {
             console.error('Error extracting config name from URL:', error);
-            this.configName = 'HCO'; // Updated to match your MDT Label
-            this.isRelatedListView = false;
+            this.configName = 'Pharmacy';
         }
     }
 
@@ -122,125 +111,39 @@ export default class RecordListView extends NavigationMixin(LightningElement) {
 
     async loadConfig() {
         try {
-            console.log('Loading config with name:', this.configName);
-            this.config = await getConfig({ configName: this.configName });
-            this.listTitle = this.config.listTitle || 
-                (this.config.recordType ? `${this.config.recordType} ${this.config.objectApiName}s` : `${this.config.objectApiName}s`);
-            this.pageSize = this.config.pageSize || 20;
-            this.loadingType = this.config.loadingType || 'infiniteScroll';
-
-            // Initialize sortFields from config.sortBy
-            this.sortFields = this.parseSortBy(this.config.sortBy || 'Name ASC');
-            this.setupColumns();
-            await this.loadRecords(true); // Ensure records load after columns are set
-        } catch (error) {
-            console.error('Error loading config:', error);
-            this.error = error.body?.message || `Error loading configuration for ${this.configName}`;
-            this.config = {};
-            this.columns = [];
-            this.listTitle = 'Records';
-        }
-    }
-
-    parseSortBy(sortBy) {
-        if (!sortBy) return [];
-        return sortBy.split(',').map(sortPart => {
-            const [fieldName, direction = 'ASC'] = sortPart.trim().split(/\s+/);
-            return {
-                fieldName: fieldName.trim(),
-                direction: direction.toLowerCase() === 'desc' ? 'desc' : 'asc'
-            };
-        });
-    }
-
-    setupColumns() {
-        if (this.config.fields && this.config.fields.length > 0) {
-            const columns = [];
-            const isAccountOrContact = this.config.objectApiName === 'Account' || this.config.objectApiName === 'Contact';
-
-            if (isAccountOrContact) {
-                columns.push({
-                    label: 'Name',
-                    fieldName: 'Name',
-                    sortable: true,
-                    isLink: true,
-                    type: 'text',
-                    sortIcon: this.getSortIconForField('Name')
-                });
-            }
-
-            this.config.fields.forEach(fieldConfig => {
-                if (typeof fieldConfig === 'string') {
-                    if (isAccountOrContact && (fieldConfig === 'FirstName' || fieldConfig === 'LastName' || fieldConfig === 'Name')) {
-                        return;
-                    }
-                    columns.push({
-                        label: this.formatLabel(fieldConfig),
-                        fieldName: fieldConfig,
-                        sortable: true,
-                        isLink: this.isLinkField(fieldConfig),
-                        type: 'text',
-                        sortIcon: this.getSortIconForField(fieldConfig)
-                    });
-                } else if (typeof fieldConfig === 'object' && fieldConfig.fieldName) {
-                    if (isAccountOrContact && (fieldConfig.fieldName === 'FirstName' || fieldConfig.fieldName === 'LastName' || fieldConfig.fieldName === 'Name')) {
-                        return;
-                    }
-                    columns.push({
-                        label: fieldConfig.label || this.formatLabel(fieldConfig.fieldName),
-                        fieldName: fieldConfig.fieldName,
-                        sortable: fieldConfig.sortable !== false,
-                        isLink: fieldConfig.isLink || false,
-                        type: fieldConfig.type || 'text',
-                        sortIcon: this.getSortIconForField(fieldConfig.fieldName)
-                    });
-                }
-            });
-
-            this.columns = columns.filter(col => col && col.fieldName);
-            console.log('Columns with sortIcons:', JSON.stringify(this.columns));
-        }
-    }
-
-    handleSort(event) {
-        const fieldName = event.currentTarget.dataset.field;
-        let sortFields = [...this.sortFields];
-        const existingSortIndex = sortFields.findIndex(sf => sf.fieldName === fieldName);
-
-        // Check if the field is sortable
-        const column = this.columns.find(col => col.fieldName === fieldName);
-        if (!column || !column.sortable) {
-            console.log('Field is not sortable:', fieldName);
-            return;
-        }
-
-        if (existingSortIndex >= 0) {
-            sortFields[existingSortIndex].direction = sortFields[existingSortIndex].direction === 'asc' ? 'desc' : 'asc';
-        } else {
-            const defaultSort = this.parseSortBy(this.config.sortBy || 'Name ASC').find(sf => sf.fieldName === fieldName);
-            const newDirection = defaultSort ? (defaultSort.direction === 'asc' ? 'desc' : 'asc') : 'asc'; // Default to 'asc' for new fields
-            sortFields.push({ fieldName, direction: newDirection });
-        }
-
-        // Keep only unique fields and maintain order
-        sortFields = sortFields.filter((sf, index, self) => 
-            self.findIndex(s => s.fieldName === sf.fieldName) === index
-        );
-
-        this.sortFields = sortFields;
-
-        // Update column sort icons immediately
-        this.columns = this.columns.map(col => ({
-            ...col,
-            sortIcon: this.getSortIconForField(col.fieldName)
-        }));
-
-        console.log('Updated sortFields:', JSON.stringify(this.sortFields));
-
-        this.queryLocatorId = null;
-        this.expandedCardIds.clear();
+        console.log('Loading config with name:', this.configName);
+        this.config = await getConfig({ configName: this.configName });
+        this.listTitle = this.config.listTitle || 
+            (this.config.recordType ? `${this.config.recordType} ${this.config.objectApiName}s` : `${this.config.objectApiName}s`);
+        this.pageSize = this.config.pageSize || 20;
+        this.loadingType = this.config.loadingType || 'infiniteScroll';
+        
+        // Parse sortBy from config to extract multiple fields
+        this.parseSortByFromConfig();
+        
+        this.setupColumns();
         this.loadRecords(true);
+    } catch (error) {
+        console.error('Error loading config:', error);
+        this.error = error.body?.message || `Error loading configuration for ${this.configName}`;
+        this.config = {};
+        this.columns = [];
+        this.listTitle = 'Records';
     }
+}
+
+// Add new method to parse sortBy from config
+parseSortByFromConfig() {
+    if (this.config.sortBy) {
+        // Parse "Name ASC, Site ASC" format
+        const sortParts = this.config.sortBy.split(',');
+        if (sortParts.length > 0) {
+            const firstSort = sortParts[0].trim().split(' ');
+            this.sortField = firstSort[0];
+            this.sortDirection = firstSort.length > 1 ? firstSort[1].toLowerCase() : 'asc';
+        }
+    }
+}
 
     async loadRecords(reset = false) {
         if (!this.hasMoreRecords && !reset) return;
@@ -261,15 +164,14 @@ export default class RecordListView extends NavigationMixin(LightningElement) {
             }
             this.error = undefined;
 
+            const sortBy = this.sortField ? `${this.sortField} ${this.sortDirection.toUpperCase()}` : this.config.sortBy;
             const result = await getRecords({
                 configName: this.configName,
                 pageSize: this.pageSize,
                 offset: this.currentOffset,
                 searchTerm: this.searchTerm,
-                sortFields: this.sortFields,
-                queryLocatorId: this.queryLocatorId,
-                parentRecordId: this.parentRecordId,
-                relatedObjectApiName: this.relatedObjectApiName
+                sortBy: sortBy,
+                queryLocatorId: this.queryLocatorId
             });
 
             this.queryLocatorId = result.queryLocatorId;
@@ -285,6 +187,7 @@ export default class RecordListView extends NavigationMixin(LightningElement) {
                 if (this.columns && this.columns.length > 0) {
                     this.columns.forEach(column => {
                         let fieldValue = this.getFieldValue(record, column.fieldName);
+                        // Use Name field for Accounts and Contacts, combining FirstName and LastName if Name is null
                         if (column.fieldName === 'Name' && (this.config.objectApiName === 'Account' || this.config.objectApiName === 'Contact')) {
                             const nameValue = this.getFieldValue(record, 'Name') || '';
                             if (!nameValue) {
@@ -326,6 +229,7 @@ export default class RecordListView extends NavigationMixin(LightningElement) {
             this.hasMoreRecords = result.hasMore;
             this.currentOffset += result.records.length;
             this.lastUpdateTime = new Date();
+
         } catch (error) {
             this.error = error.body?.message || 'Error fetching records';
             if (reset) {
@@ -340,10 +244,102 @@ export default class RecordListView extends NavigationMixin(LightningElement) {
         }
     }
 
-    getSortIconForField(fieldName) {
-        const sortField = this.sortFields.find(sf => sf.fieldName === fieldName);
-        return sortField ? (sortField.direction === 'asc' ? 'utility:arrowup' : 'utility:arrowdown') : null;
+    setupColumns() {
+    if (this.config.fields && this.config.fields.length > 0) {
+        const columns = [];
+        const isAccountOrContact = this.config.objectApiName === 'Account' || this.config.objectApiName === 'Contact';
+        
+        // Get sortable fields from config sortBy
+        const sortableFieldsFromConfig = this.getSortableFieldsFromConfig();
+
+        // Always add Name column for Account or Contact objects
+        if (isAccountOrContact) {
+            columns.push({
+                label: 'Name',
+                fieldName: 'Name',
+                sortable: true, // Always sortable for Name field
+                isLink: true,
+                type: 'text',
+                sortIcon: this.getSortIconForField('Name')
+            });
+        }
+
+        // Process JSON fields
+        this.config.fields.forEach(fieldConfig => {
+            if (typeof fieldConfig === 'string') {
+                if (isAccountOrContact && (fieldConfig === 'FirstName' || fieldConfig === 'LastName' || fieldConfig === 'Name')) {
+                    return; // Skip FirstName, LastName, and Name
+                }
+                
+                // Check if field is sortable from config or explicitly marked as sortable
+                const isSortable = sortableFieldsFromConfig.includes(fieldConfig);
+                
+                columns.push({
+                    label: this.formatLabel(fieldConfig),
+                    fieldName: fieldConfig,
+                    sortable: isSortable,
+                    isLink: this.isLinkField(fieldConfig),
+                    type: 'text',
+                    sortIcon: this.getSortIconForField(fieldConfig)
+                });
+            } else if (typeof fieldConfig === 'object' && fieldConfig.fieldName) {
+                if (isAccountOrContact && (fieldConfig.fieldName === 'FirstName' || fieldConfig.fieldName === 'LastName' || fieldConfig.fieldName === 'Name')) {
+                    return; // Skip FirstName, LastName, and Name
+                }
+                
+                // Check if field is sortable from config or field definition
+                const isSortableFromConfig = sortableFieldsFromConfig.includes(fieldConfig.fieldName);
+                const isSortable = fieldConfig.sortable !== false && (fieldConfig.sortable === true || isSortableFromConfig);
+                
+                columns.push({
+                    label: fieldConfig.label || this.formatLabel(fieldConfig.fieldName),
+                    fieldName: fieldConfig.fieldName,
+                    sortable: isSortable,
+                    isLink: fieldConfig.isLink || false,
+                    type: fieldConfig.type || 'text',
+                    sortIcon: this.getSortIconForField(fieldConfig.fieldName)
+                });
+            } else if (typeof fieldConfig === 'object' && fieldConfig.sectionLabel && fieldConfig.fields) {
+                fieldConfig.fields.forEach(nestedField => {
+                    if (typeof nestedField === 'object' && nestedField.fieldName) {
+                        if (isAccountOrContact && (nestedField.fieldName === 'FirstName' || nestedField.fieldName === 'LastName' || nestedField.fieldName === 'Name')) {
+                            return; // Skip FirstName, LastName, and Name
+                        }
+                        
+                        const isSortableFromConfig = sortableFieldsFromConfig.includes(nestedField.fieldName);
+                        const isSortable = nestedField.sortable !== false && (nestedField.sortable === true || isSortableFromConfig);
+                        
+                        columns.push({
+                            label: nestedField.label || this.formatLabel(nestedField.fieldName),
+                            fieldName: nestedField.fieldName,
+                            sortable: isSortable,
+                            isLink: nestedField.isLink || false,
+                            type: nestedField.type || 'text',
+                            sortIcon: this.getSortIconForField(nestedField.fieldName)
+                        });
+                    }
+                });
+            }
+        });
+
+        this.columns = columns.filter(col => col && col.fieldName);
     }
+}
+
+// Add new method to extract sortable fields from config sortBy
+getSortableFieldsFromConfig() {
+    const sortableFields = [];
+    if (this.config.sortBy) {
+        const sortParts = this.config.sortBy.split(',');
+        sortParts.forEach(part => {
+            const fieldName = part.trim().split(' ')[0];
+            if (fieldName && !sortableFields.includes(fieldName)) {
+                sortableFields.push(fieldName);
+            }
+        });
+    }
+    return sortableFields;
+}
 
     setupMobileFields(record) {
         if (!record.cells || record.cells.length === 0) return;
@@ -394,6 +390,34 @@ export default class RecordListView extends NavigationMixin(LightningElement) {
         }, 500);
     }
 
+handleSort(event) {
+    const fieldName = event.currentTarget.dataset.field;
+    
+    // Check if field is actually sortable
+    const column = this.columns.find(col => col.fieldName === fieldName);
+    if (!column || !column.sortable) {
+        console.warn('Field is not sortable:', fieldName);
+        return;
+    }
+    
+    if (this.sortField === fieldName) {
+        this.sortDirection = this.sortDirection === 'asc' ? 'desc' : 'asc';
+    } else {
+        this.sortField = fieldName;
+        this.sortDirection = 'asc';
+    }
+    
+    // Update column sort icons
+    this.columns = this.columns.map(col => ({
+        ...col,
+        sortIcon: this.getSortIconForField(col.fieldName)
+    }));
+    
+    // Clear query locator to force new query with new sort order
+    this.queryLocatorId = null;
+    this.expandedCardIds.clear();
+    this.loadRecords(true);
+}
     handleRefresh() {
         this.expandedCardIds.clear();
         this.queryLocatorId = null;
@@ -402,45 +426,38 @@ export default class RecordListView extends NavigationMixin(LightningElement) {
     }
 
     handleRowClick(event) {
-        if (window.getSelection && window.getSelection().toString()) {
-            return;
-        }
-        
-        if (event.detail > 1) {
-            return;
-        }
+    const recordId = event.currentTarget.dataset.id;
+    const fieldName = event.currentTarget.dataset.field;
 
-        const recordId = event.currentTarget.dataset.id;
-        const fieldName = event.currentTarget.dataset.field;
+    // Fallback to old behavior if fieldName or columns are not available
+    if (!fieldName || !this.columns || this.columns.length === 0) {
+        console.warn('Field name or columns not available, proceeding with navigation');
+        this[NavigationMixin.Navigate]({
+            type: 'standard__webPage',
+            attributes: {
+                url: `/frmportal/s/recorddetailpage?recordId=${recordId}`
+            }
+        });
+        return;
+    }
 
-        if (!fieldName || !this.columns || this.columns.length === 0) {
-            console.warn('Field name or columns not available, proceeding with navigation');
+    const column = this.columns.find(col => col.fieldName === fieldName);
+    if (column && column.isLink) {
+        try {
             this[NavigationMixin.Navigate]({
                 type: 'standard__webPage',
                 attributes: {
                     url: `/frmportal/s/recorddetailpage?recordId=${recordId}`
                 }
             });
-            return;
+        } catch (error) {
+            console.error('Navigation error:', error);
+            this.showToast('Error', 'Failed to navigate to record page.', 'error');
         }
-
-        const column = this.columns.find(col => col.fieldName === fieldName);
-        if (column && column.isLink) {
-            try {
-                this[NavigationMixin.Navigate]({
-                    type: 'standard__webPage',
-                    attributes: {
-                        url: `/frmportal/s/recorddetailpage?recordId=${recordId}`
-                    }
-                });
-            } catch (error) {
-                console.error('Navigation error:', error);
-                this.showToast('Error', 'Failed to navigate to record page.', 'error');
-            }
-        } else {
-            console.log('Field is not a link or column not found:', fieldName);
-        }
+    } else {
+        console.log('Field is not a link or column not found:', fieldName);
     }
+}
 
     handleCardExpand(event) {
         event.stopPropagation();
@@ -578,4 +595,11 @@ export default class RecordListView extends NavigationMixin(LightningElement) {
     get showInfiniteScrollLoader() {
         return this.isLoadingMore && this.hasMoreRecords;
     }
+
+    getSortIconForField(fieldName) {
+    if (this.sortField === fieldName) {
+        return this.sortDirection === 'asc' ? 'utility:arrowup' : 'utility:arrowdown';
+    }
+    return 'utility:arrowdown';
+}
 }
