@@ -2,7 +2,7 @@
   @description       : 
   @author            : ChangeMeIn@UserSettingsUnder.SFDoc
   @group             : 
-  @last modified on  : 07-19-2025
+  @last modified on  : 07-21-2025
   @last modified by  : ChangeMeIn@UserSettingsUnder.SFDoc
 -->
 <template>
@@ -12,6 +12,34 @@
             <div class="list-title-section">
                 <h1 class="list-title">
                     <span class="title-text">{listTitle}</span>
+                    <!-- Mobile Sort Header -->
+<div class="mobile-sort-header dropdown-wrapper">
+    <span class="mobile-sort-label">Sort by:</span>
+
+    <div class="dropdown default-open">
+        <button class="dropdown-toggle">Select Field</button>
+        <ul class="dropdown-menu">
+            <template for:each={columns} for:item="column">
+                <li key={column.fieldName}>
+                    <template if:true={column.sortable}>
+                        <button 
+                            class="dropdown-item"
+                            data-field={column.fieldName}
+                            onclick={handleSort}>
+                            {column.label}
+                            <lightning-icon 
+                                icon-name={column.sortIcon}
+                                size="xx-small"
+                                class="sort-icon">
+                            </lightning-icon>
+                        </button>
+                    </template>
+                </li>
+            </template>
+        </ul>
+    </div>
+</div>
+
                 </h1>
                 <div class="item-count">{itemsDisplayText}</div>
             </div>

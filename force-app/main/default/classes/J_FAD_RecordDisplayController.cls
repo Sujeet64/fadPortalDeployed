@@ -2,7 +2,7 @@
  * @description       : Controller for handling record display and search functionality in a list view.
  * @author            : ChangeMeIn@UserSettingsUnder.SFDoc
  * @group             : 
- * @last modified on  : 07-19-2025
+ * @last modified on  : 07-21-2025
  * @last modified by  : ChangeMeIn@UserSettingsUnder.SFDoc
  */
 public with sharing class J_FAD_RecordDisplayController {

@@ -1,3 +1,4 @@
+
 import { LightningElement, track, wire } from 'lwc';
 import { ShowToastEvent } from 'lightning/platformShowToastEvent';
 import { NavigationMixin } from 'lightning/navigation';
@@ -32,12 +33,15 @@ export default class RecordListView extends NavigationMixin(LightningElement) {
     configName = 'Pharmacy'; // Default fallback
     scrollThreshold = 100;
     isScrollLoading = false;
-
+    @track isDropdownOpen = false;
     // Store scroll position
     scrollPosition = 0;
     containerHeight = 0;
-
+        toggleDropdown() {
+        this.isDropdownOpen = !this.isDropdownOpen;
+    }
     connectedCallback() {
+        this.isMobile = window.innerWidth <= 768;
         this.getCurrentPageReference();
     }
 
